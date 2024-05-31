@@ -64,29 +64,7 @@ const addMernis = async (req, res) => {
     }
 
     // Verileri uygun formata dönüştürme
-    const values = mernisData.map(data => `('${data.tckn}', '${data.birth_date}', '${data.type}', '${data.s{
-  "mernisData": [
-    {
-      "tckn": "38528448394",
-      "birth_date": "27.10.1986",
-      "type": "regmernis",
-      "stock": "available"
-    },
-    {
-      "tckn": "46665182750",
-      "birth_date": "21.05.1975",
-      "type": "regmernis",
-      "stock": "available"
-    },
-    {
-      "tckn": "82277598626",
-      "birth_date": "01.02.1988",
-      "type": "regmernis",
-      "stock": "available"
-    }
-    // Diğer mernis verileri buraya eklenebilir
-  ]
-}tock}')`).join(',');
+    const values = mernisData.map(data => `('${data.tckn}', '${data.birth_date}', '${data.type}', '${data.stock}')`).join(',');
 
     const query = `
       INSERT INTO "public"."mernisTable" (tckn, birth_date, type, stock)
