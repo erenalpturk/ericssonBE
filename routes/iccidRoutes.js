@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const iccidController = require("../controllers/iccidController.js");
 
-router.get("/getIccid", iccidController.getIccid);
-router.get("/setSold", iccidController.setSold);
-router.get("/setAvailable", iccidController.setAvailable);
-router.get("/addIccid", iccidController.addIccid);
+router.post("/getIccid", iccidController.getIccid);
+router.post("/setSold", iccidController.setSold);
+router.post("/setAvailable", iccidController.setAvailable);
+router.post("/addIccid", iccidController.addIccid);
 
 module.exports = router;
