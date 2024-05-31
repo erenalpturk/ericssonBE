@@ -84,5 +84,6 @@ const addMernis = async (req, res) => {
 module.exports = {
     getMernis,
     getAll,
-    deleteSold
+    deleteSold,
+    addMernis
 };
