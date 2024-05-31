@@ -170,37 +170,39 @@ const addActivation = async (req, res) => {
       if (result.rows.length > 0) {
         res.status(400).json({ error: "Bu MSISDN zaten kayıtlı" });
         return;
+      } else {
+        if (msisdn == "") {
+          res.status(400).json({ error: "msisn alanı doldurulmadı" });
+          return;
+        }
+        else if (!tckn) {
+          res.status(400).json({ error: "tckn alanı doldurulmadı" });
+          return;
+        }
+        else if (!birth_date) {
+          res.status(400).json({ error: "birth_date alanı doldurulmadı" });
+          return;
+        }
+        else if (!activationType) {
+          res.status(400).json({ error: "activationType alanı doldurulmadı" });
+          return;
+        } const query = `
+        INSERT INTO "public"."activationstable" (msisdn, tckn, birth_date, activationType, "user")
+        VALUES ($1, $2, $3, $4, $5)
+      `;
+        try {
+          const result = pool.query(query, [msisdn, tckn, birth_date, activationType, user]);
+          res.json({ message: "Data Db'ye başarıyla eklendi" });
+        } catch (error) {
+          console.error("Error executing query", error);
+          res.status(500).json({ error: "Internal Server Error" });
+        }
+
       }
     }
   );
 
-  if (msisdn=="" ) {
-    res.status(400).json({ error: "msisn alanı doldurulmadı" });
-    return;
-  }
-  else if (!tckn) {
-    res.status(400).json({ error: "tckn alanı doldurulmadı" });
-    return;
-  }
-  else if (!birth_date) {
-    res.status(400).json({ error: "birth_date alanı doldurulmadı" });
-    return;
-  }
-  else if (!activationType) {
-    res.status(400).json({ error: "activationType alanı doldurulmadı" });
-    return;
-  }
-  const query = `
-  INSERT INTO "public"."activationstable" (msisdn, tckn, birth_date, activationType, "user")
-  VALUES ($1, $2, $3, $4, $5)
-`;
-  try {
-    const result = await pool.query(query, [msisdn, tckn, birth_date, activationType, user]);
-    res.json({ message: "Data Db'ye başarıyla eklendi" });
-  } catch (error) {
-    console.error("Error executing query", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+
 };
 
 const getActivations = async (req, res) => {
