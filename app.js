@@ -25,8 +25,6 @@ app.use('/iccid', iccidRoutes);
 
 
 
-
-
 const PORT = 3050;
 app.listen(PORT, () => {
 	connectDB();

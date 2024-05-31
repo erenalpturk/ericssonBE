@@ -123,10 +123,25 @@ const addIccid = async (req, res) => {
 }*/
 
 
+const deleteAll = async (req, res) => {
+  const query = `DELETE FROM "public"."users" WHERE stock = 'sold' or stock = 'reserved'`;
+
+  pool.query(query, (error, result) => {
+    if (error) {
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
+      return;
+    }
+    res.json({ message: "ICCID'ler silindi" });
+  });
+};
+
+
 module.exports = {
   getIccid,
   setSold,
   setAvailable,
   addIccid,
-  getAll
+  getAll,
+  deleteAll
 };
