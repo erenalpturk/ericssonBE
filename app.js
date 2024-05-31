@@ -5,6 +5,7 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const iccidRoutes = require('./routes/iccidRoutes');
+const mernisRoutes = require('./routes/mernisRoutes');
 
 
 const connectionString = process.env.CONNECTION_URL;
@@ -22,6 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 
 
 app.use('/iccid', iccidRoutes);
+app.use('/mernis', mernisRoutes);
 
 
 
