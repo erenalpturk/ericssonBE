@@ -36,7 +36,7 @@ const getAll = async (req, res) => {
                 return;
             }
             if (result.rows.length === 0) {
-                res.json({message: "Mernis kalmamış knk"});
+                res.json({ message: "Mernis kalmamış knk" });
             } else {
                 res.json(result.rows);
             }
@@ -53,6 +53,53 @@ const deleteSold = async (req, res) => {
             return;
         }
         res.json({ message: "Kullanılmış mernis'ler silindi" });
+    });
+};
+
+const addMernis = async (req, res) => {
+    const mernisData = req.body.mernisData;
+    if (!mernisData) {
+        res.status(400).json({ error: "Mernis verisi gereklidir" });
+        return;
+    }
+
+    // Verileri uygun formata dönüştürme
+    const values = mernisData.map(data => `('${data.tckn}', '${data.birth_date}', '${data.type}', '${data.s{
+  "mernisData": [
+    {
+      "tckn": "38528448394",
+      "birth_date": "27.10.1986",
+      "type": "regmernis",
+      "stock": "available"
+    },
+    {
+      "tckn": "46665182750",
+      "birth_date": "21.05.1975",
+      "type": "regmernis",
+      "stock": "available"
+    },
+    {
+      "tckn": "82277598626",
+      "birth_date": "01.02.1988",
+      "type": "regmernis",
+      "stock": "available"
+    }
+    // Diğer mernis verileri buraya eklenebilir
+  ]
+}tock}')`).join(',');
+
+    const query = `
+      INSERT INTO "public"."mernisTable" (tckn, birth_date, type, stock)
+      VALUES ${values};
+    `;
+
+    pool.query(query, (error, result) => {
+        if (error) {
+            console.error("Query hatası", error);
+            res.status(500).json({ error: "Sunucu Hatası" });
+            return;
+        }
+        res.json({ message: "Mernis verileri başarıyla eklendi" });
     });
 };
 
