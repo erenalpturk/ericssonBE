@@ -208,7 +208,9 @@ const getActivations = async (req, res) => {
 };
 
 const getActivationsPublic = async (req, res) => {
-  const query = `SELECT * FROM "public"."activationstable";`
+  const query = `SELECT *
+  FROM public.activationstable
+  WHERE "user" NOT IN ('alp', 'enes')`
   pool.query(
     query, (error, result) => {
       if (error) {
