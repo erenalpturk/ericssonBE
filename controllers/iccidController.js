@@ -158,6 +158,22 @@ const addActivation = async (req, res) => {
   const activationType = req.body.activationtype;
   const user = req.body.user;
 
+  pool.query(
+    `SELECT * FROM "public"."activationstable" WHERE msisdn = '${msisdn}'`,
+    (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+
+      if (result.rows.length > 0) {
+        res.status(400).json({ error: "Bu MSISDN zaten kayıtlı" });
+        return;
+      }
+    }
+  );
+
   if (msisdn=="" ) {
     res.status(400).json({ error: "msisn alanı doldurulmadı" });
     return;
