@@ -26,6 +26,25 @@ const getIccid = async (req, res) => {
   );
 };
 
+const getAll = async (req, res) => {
+  pool.query(
+    `SELECT * FROM "public"."users"`,
+    (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+
+      if (result.rows.length === 0) {
+        res.json({ message: "ICCID kalmamış knk" });
+      } else {
+        res.json(result.rows);
+      }
+    }
+  );
+};
+
 const setSold = async (req, res) => {
   const { iccid } = req.body; 
   if (!iccid) {
@@ -109,4 +128,5 @@ module.exports = {
   setSold,
   setAvailable,
   addIccid,
+  getAll
 };
