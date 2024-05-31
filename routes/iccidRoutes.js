@@ -8,5 +8,8 @@ router.post("/setAvailable", iccidController.setAvailable);
 router.post("/addIccid", iccidController.addIccid);
 router.post("/getAll", iccidController.getAll);
 router.post("/deleteAll", iccidController.deleteAll);
+router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);
+router.post("/enesvealpdatalarinizigetiriyor", iccidController.getActivationsPublic);
+router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
 
 module.exports = router;

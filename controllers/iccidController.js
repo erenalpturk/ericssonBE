@@ -6,7 +6,7 @@ const pool = new Pool({ connectionString });
 const getIccid = async (req, res) => {
   const type = req.params.type;
   const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`
-;
+    ;
   pool.query(
     query, (error, result) => {
       if (error) {
@@ -47,7 +47,7 @@ const getAll = async (req, res) => {
 };
 
 const setSold = async (req, res) => {
-  const { iccid } = req.body; 
+  const { iccid } = req.body;
   if (!iccid) {
     res.status(400).json({ error: "ICCID is required" });
     return;
@@ -63,7 +63,7 @@ const setSold = async (req, res) => {
       res.status(500).json({ error: "Internal Server Error" });
       return;
     }
-    
+
     if (result.rowCount === 0) {
       res.status(404).json({ message: "ICCID not found" });
     } else {
@@ -94,7 +94,7 @@ const setAvailable = async (req, res) => {
       res.status(500).json({ error: "Internal Server Error" });
       return;
     }
-    
+
     if (result.rowCount === 0) {
       res.status(404).json({ message: "ICCID not found" });
     } else {
@@ -151,11 +151,89 @@ const deleteAll = async (req, res) => {
 };
 
 
+const addActivation = async (req, res) => {
+  const msisdn = req.body.msisdn;
+  const tckn = req.body.tckn;
+  const birth_date = req.body.birth_date;
+  const activationType = req.body.activationtype;
+  const user = req.body.user;
+
+  if (msisdn=="" ) {
+    res.status(400).json({ error: "msisn alanı doldurulmadı" });
+    return;
+  }
+  else if (!tckn) {
+    res.status(400).json({ error: "tckn alanı doldurulmadı" });
+    return;
+  }
+  else if (!birth_date) {
+    res.status(400).json({ error: "birth_date alanı doldurulmadı" });
+    return;
+  }
+  else if (!activationType) {
+    res.status(400).json({ error: "activationType alanı doldurulmadı" });
+    return;
+  }
+  const query = `
+  INSERT INTO "public"."activationstable" (msisdn, tckn, birth_date, activationType, "user")
+  VALUES ($1, $2, $3, $4, $5)
+`;
+  try {
+    const result = await pool.query(query, [msisdn, tckn, birth_date, activationType, user]);
+    res.json({ message: "Data Db'ye başarıyla eklendi" });
+  } catch (error) {
+    console.error("Error executing query", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const getActivations = async (req, res) => {
+  const user = req.params.user;
+  const query = `SELECT * FROM "public"."activationstable" WHERE "user"='${user}';`
+  pool.query(
+    query, (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+      if (result.rows.length === 0) {
+        res.json({ message: `Datan kalmamış knk` });
+      } else {
+        const data = result.rows;
+        res.json(data);
+      }
+    }
+  );
+};
+
+const getActivationsPublic = async (req, res) => {
+  const query = `SELECT * FROM "public"."activationstable";`
+  pool.query(
+    query, (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+      if (result.rows.length === 0) {
+        res.json({ message: `Datan kalmamış knk` });
+      } else {
+        const data = result.rows;
+        res.json(data);
+      }
+    }
+  );
+};
+
 module.exports = {
   getIccid,
   setSold,
   setAvailable,
   addIccid,
   getAll,
-  deleteAll
+  deleteAll,
+  addActivation,
+  getActivations,
+  getActivationsPublic
 };
