@@ -240,7 +240,7 @@ const getActivations = async (req, res) => {
         return;
       }
       if (result.rows.length === 0) {
-        res.json({ message: `Datan kalmamış knki` });
+        res.json({ message: `Datan kalmamış knk` });
       } else {
         const data = result.rows;
         res.json(data);
