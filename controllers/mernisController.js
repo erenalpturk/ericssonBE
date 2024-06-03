@@ -44,6 +44,32 @@ const getAll = async (req, res) => {
     );
 };
 
+
+const getAllSpesific = async (req, res) => {
+    const type = req.params.type;
+    const stock = req.params.stock;
+    pool.query(
+      `SELECT * FROM "public"."mernisTable" WHERE type = '${type}' AND stock = '${stock}'`,
+      (error, result) => {
+        if (error) {
+          console.error("Error executing query", error);
+          res.status(500).json({ error: "Internal Server Error" });
+          return;
+        }
+  
+        if (result.rows.length === 0) {
+          res.json({ message: `${type} türünde ${stock} mernis kalmamış knk` });
+        } else {
+  
+          res.json({
+            message: `${result.rows.length} adet ${type} türünde ${stock} mernis bulundu`,
+            data: result.rows
+          });
+        }
+      }
+    );
+  };
+
 const deleteSold = async (req, res) => {
     const query = `DELETE FROM "public"."mernisTable" WHERE stock = 'sold'`;
     pool.query(query, (error, result) => {
@@ -85,5 +111,6 @@ module.exports = {
     getMernis,
     getAll,
     deleteSold,
-    addMernis
+    addMernis,
+    getAllSpesific
 };
