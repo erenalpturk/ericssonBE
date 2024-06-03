@@ -15,7 +15,7 @@ const getIccid = async (req, res) => {
         return;
       }
       if (result.rows.length === 0) {
-        res.json({ message: `${type} türünde ICCID kalmamış knk` });
+        res.status(404).json({ error: `${type} türünde ICCID kalmamış knk`});
       } else {
         const iccid = result.rows[0].iccid;
         res.json(iccid);
