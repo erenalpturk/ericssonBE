@@ -6,6 +6,7 @@ router.post("/getIccid/:type", iccidController.getIccid);
 router.post("/setSold", iccidController.setSold);
 router.post("/setAvailable", iccidController.setAvailable);
 router.post("/addIccid", iccidController.addIccid);
+router.post("/getAll/:type/:stock", iccidController.getAllSpesific);
 router.post("/getAll", iccidController.getAll);
 router.post("/deleteAll", iccidController.deleteAll);
 router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);

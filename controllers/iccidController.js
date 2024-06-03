@@ -27,6 +27,30 @@ const getIccid = async (req, res) => {
   );
 };
 
+const getAllSpesific = async (req, res) => {
+  const type = req.params.type;
+  const stock = req.params.stock;
+  pool.query(
+    `SELECT * FROM "public"."iccidTable" WHERE type = '${type}' AND stock = '${stock}'`,
+    (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+
+      if (result.rows.length === 0) {
+        res.json({ message: `${type} türünde ${stock} ICCID kalmamış knk` });
+      } else {
+
+        res.json({
+          message: `${result.rows.length} adet ${type} türünde ${stock} ICCID bulundu`,
+          data: result.rows
+        });
+      }
+    }
+  );
+};
 const getAll = async (req, res) => {
   pool.query(
     `SELECT * FROM "public"."iccidTable"`,
@@ -255,5 +279,6 @@ module.exports = {
   deleteAll,
   addActivation,
   getActivations,
-  getActivationsPublic
+  getActivationsPublic,
+  getAllSpesific
 };
