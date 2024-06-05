@@ -15,7 +15,7 @@ const getIccid = async (req, res) => {
         return;
       }
       if (result.rows.length === 0) {
-        res.status(404).json({ error: `${type} türünde ICCID kalmamış knk`});
+        res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
       } else {
         const iccid = result.rows[0].iccid;
         res.json(iccid);
@@ -183,7 +183,8 @@ const addActivation = async (req, res) => {
   const user = req.body.user;
 
   pool.query(
-    `SELECT * FROM "public"."activationstable" WHERE msisdn = '${msisdn}'`,
+    `SELECT * FROM "public"."activationstable" WHERE msisdn = $1`,
+    [msisdn],
     (error, result) => {
       if (error) {
         console.error("Error executing query", error);
@@ -195,39 +196,39 @@ const addActivation = async (req, res) => {
         res.status(400).json({ error: "Bu MSISDN zaten kayıtlı" });
         return;
       } else {
-        if (msisdn == "") {
-          res.status(400).json({ error: "msisn alanı doldurulmadı" });
+        if (!msisdn) {
+          res.status(400).json({ error: "msisdn alanı doldurulmadı" });
           return;
-        }
-        else if (!tckn) {
+        } else if (!tckn) {
           res.status(400).json({ error: "tckn alanı doldurulmadı" });
           return;
-        }
-        else if (!birth_date) {
+        } else if (!birth_date) {
           res.status(400).json({ error: "birth_date alanı doldurulmadı" });
           return;
-        }
-        else if (!activationType) {
+        } else if (!activationType) {
           res.status(400).json({ error: "activationType alanı doldurulmadı" });
           return;
-        } const query = `
-        INSERT INTO "public"."activationstable" (msisdn, tckn, birth_date, activationType, "user")
-        VALUES ($1, $2, $3, $4, $5)
-      `;
-        try {
-          const result = pool.query(query, [msisdn, tckn, birth_date, activationType, user]);
-          res.json({ message: "Data Db'ye başarıyla eklendi" });
-        } catch (error) {
-          console.error("Error executing query", error);
-          res.status(500).json({ error: "Internal Server Error" });
         }
 
+        const query = `
+          INSERT INTO "public"."activationstable" (msisdn, tckn, birth_date, activationType, "user", created_at)
+          VALUES ($1, $2, $3, $4, $5, NOW() AT TIME ZONE 'Europe/Istanbul')
+        `;
+
+        pool.query(query, [msisdn, tckn, birth_date, activationType, user], (error, result) => {
+          if (error) {
+            console.error("Error executing query", error);
+            res.status(500).json({ error: "Internal Server Error" });
+            return;
+          }
+
+          res.json({ message: "Data Db'ye başarıyla eklendi" });
+        });
       }
     }
   );
-
-
 };
+
 
 const getActivations = async (req, res) => {
   const user = req.params.user;

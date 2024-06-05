@@ -7,7 +7,6 @@ require('dotenv').config();
 const iccidRoutes = require('./routes/iccidRoutes');
 const mernisRoutes = require('./routes/mernisRoutes');
 
-
 const connectionString = process.env.CONNECTION_URL;
 const pool = new Pool({ connectionString });
 let client;
