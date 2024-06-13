@@ -170,7 +170,19 @@ const deleteAll = async (req, res) => {
       res.status(500).json({ error: "Internal Server Error" });
       return;
     }
-    res.json({ message: "ICCID'ler silindi" });
+    res.json({ message: "Reserved ve sold ICCID'ler silindi" });
+  });
+};
+const resetIccid = async (req, res) => {
+  const query = `DELETE FROM "public"."iccidTable";`;
+
+  pool.query(query, (error, result) => {
+    if (error) {
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
+      return;
+    }
+    res.json({ message: "Tüm ICCID'ler silindi" });
   });
 };
 
@@ -283,5 +295,6 @@ module.exports = {
   addActivation,
   getActivations,
   getActivationsPublic,
-  getAllSpesific
+  getAllSpesific,
+  resetIccid
 };

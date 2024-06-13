@@ -9,6 +9,7 @@ router.post("/addIccid", iccidController.addIccid);
 router.post("/getAll/:type/:stock", iccidController.getAllSpesific);
 router.post("/getAll", iccidController.getAll);
 router.post("/deleteAll", iccidController.deleteAll);
+router.post("/resetIccid", iccidController.resetIccid);
 router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);
 router.post("/enesvealpdatalarinizigetiriyor", iccidController.getActivationsPublic);
 router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
