@@ -232,7 +232,7 @@ const addActivation = async (req, res) => {
 
 const getActivations = async (req, res) => {
   const user = req.params.user;
-  const query = `SELECT * FROM "public"."activationstable" WHERE "user"='${user}';`
+  const query = `SELECT * FROM "public"."activationstable" WHERE "user"='${user} ORDER BY created_at DESC;`
   pool.query(
     query, (error, result) => {
       if (error) {
@@ -252,8 +252,10 @@ const getActivations = async (req, res) => {
 
 const getActivationsPublic = async (req, res) => {
   const query = `SELECT *
-  FROM public.activationstable
-  WHERE "user" NOT IN ('alp', 'enes')`
+FROM public.activationstable
+WHERE "user" NOT IN ('alp', 'enes')
+ORDER BY created_at DESC;
+`
   pool.query(
     query, (error, result) => {
       if (error) {
