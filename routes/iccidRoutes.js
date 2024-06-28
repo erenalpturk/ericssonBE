@@ -14,5 +14,5 @@ router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);
 router.post("/enesvealpdatalarinizigetiriyor", iccidController.getActivationsPublic);
 router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
 router.post("/formatIccid", iccidController.formatIccid);
-
+router.post("/formatAndInsertIccids/:type", iccidController.formatAndInsertIccids);
 module.exports = router;

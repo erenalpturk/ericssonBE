@@ -266,6 +266,7 @@ ORDER BY created_at DESC;
   );
 };
 
+//DB YE EKLEMEZ SADECE FORMATLAR :* :*
 const formatIccid = async (req, res) => {
   try {
     const iccidText = req.body; // Text formatında gelen ICCID'leri alıyoruz
@@ -292,6 +293,67 @@ const formatIccid = async (req, res) => {
   }
 };
 
+//PARAMETRESİNİ NE İLETİRSEN O ŞEKİLDE FORMATLAR DB EKLER
+const formatAndInsertIccids = async (req, res) => {
+  try {
+    const iccidText = req.body; // Text formatında gelen ICCID'leri alıyoruz
+
+    // Kontrol ediyoruz: iccidText bir string mi?
+    if (typeof iccidText !== 'string') {
+      return res.status(400).json({ error: 'iccidText should be a string' });
+    }
+
+    // Metni satır bazında bölüp boşlukları temizliyoruz
+    const iccidArray = iccidText.split(/\r?\n/).map(iccid => iccid.trim()).filter(iccid => iccid !== '');
+
+    // Type parametresini alıyoruz
+    const type = req.params.type || 'defaultType'; // varsayılan type belirlenebilir
+
+    // Formatlanmış ICCID verisini oluşturuyoruz
+    const formattedIccids = {
+      iccids: iccidArray,
+      type: type
+    };
+
+    // Insert işlemi için hazırlanan veriler
+    const iccidsToInsert = {
+      iccids: formattedIccids.iccids,
+      type: formattedIccids.type
+    };
+
+    // Veritabanına eklemek için addIccidToDatabase fonksiyonunu çağırıyoruz
+    addIccidToDatabase(iccidsToInsert, res);
+
+  } catch (error) {
+    console.error("Error in formatAndInsertIccids function:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
+// Veritabanına ekleme fonksiyonu
+const addIccidToDatabase = (iccidsToInsert, res) => {
+  const { iccids, type } = iccidsToInsert;
+  if (!iccids || !type) {
+    res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
+    return;
+  }
+  const values = iccids.map(iccid => `('${iccid}', 'available', '${type}')`).join(',');
+  const query = `
+    INSERT INTO "public"."iccidTable" (iccid, stock, type)
+    VALUES ${values};
+  `;
+  pool.query(query, (error, result) => {
+    if (error) {
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
+      return;
+    }
+    res.json({ message: "ICCID'ler başarıyla eklendi" });
+  });
+};
+
+
 module.exports = {
   getIccid,
   setSold,
@@ -304,5 +366,6 @@ module.exports = {
   getActivationsPublic,
   getAllSpesific,
   resetIccid,
-  formatIccid
+  formatIccid,
+  formatAndInsertIccids
 };
