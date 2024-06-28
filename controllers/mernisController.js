@@ -105,6 +105,34 @@ const addMernis = async (req, res) => {
     });
 };
 
+const resetMernis = async (req, res) => {
+    const query = `DELETE FROM "public"."mernisTable";`;
+  
+    pool.query(query, (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+      res.json({ message: "Tüm Mernis'ler silindi" });
+    });
+  };
+
+  const useSql = async (req, res) => {
+    const query = req.body.query
+  
+    pool.query(query, (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+      res.json(result.rows);
+      console.log(result);
+    });
+  };
+
+
 const parseMernisData = (input, input2) => {
     const records = input.split('------------------------------------')
                         .map(record => record.trim())
@@ -163,6 +191,8 @@ module.exports = {
     getAll,
     deleteSold,
     addMernis,
+    resetMernis,
     getAllSpesific,
-    mernisData
+    mernisData,
+    useSql
 };

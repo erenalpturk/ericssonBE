@@ -8,5 +8,6 @@ router.post("/getAll", mernisController.getAll);
 router.post("/getAll/:type/:stock", mernisController.getAllSpesific);
 router.post("/addMernis", mernisController.addMernis);
 router.post("/mernisData/:type", mernisController.mernisData); 
-
+router.post("/resetMernis", mernisController.resetMernis);
+router.post("/useSql", mernisController.useSql);
 module.exports = router;
