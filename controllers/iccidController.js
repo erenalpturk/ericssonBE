@@ -1,30 +1,29 @@
+// iccidController.js
+
 const { Pool } = require("pg");
 const connectionString = process.env.CONNECTION_URL;
 const pool = new Pool({ connectionString });
 
-
 const getIccid = async (req, res) => {
   const type = req.params.type;
-  const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`
-    ;
-  pool.query(
-    query, (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
-      if (result.rows.length === 0) {
-        res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
-      } else {
-        const iccid = result.rows[0].iccid;
-        res.json(iccid);
-        pool.query(
-          `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}'`,
-        )
-      }
+  const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`;
+  
+  pool.query(query, (error, result) => {
+    if (error) {
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
+      return;
     }
-  );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
+    } else {
+      const iccid = result.rows[0].iccid;
+      res.json(iccid);
+      pool.query(
+        `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}'`
+      );
+    }
+  });
 };
 
 const getAllSpesific = async (req, res) => {
@@ -42,7 +41,6 @@ const getAllSpesific = async (req, res) => {
       if (result.rows.length === 0) {
         res.json({ message: `${type} türünde ${stock} ICCID kalmamış knk` });
       } else {
-
         res.json({
           message: `${result.rows.length} adet ${type} türünde ${stock} ICCID bulundu`,
           data: result.rows
@@ -51,6 +49,7 @@ const getAllSpesific = async (req, res) => {
     }
   );
 };
+
 const getAll = async (req, res) => {
   pool.query(
     `SELECT * FROM "public"."iccidTable"`,
@@ -93,16 +92,11 @@ const setSold = async (req, res) => {
     } else {
       res.json({ message: `ICCID ${iccid} has been sold` });
     }
-  }
-  );
+  });
 };
-/*
-  setSold body formatı şu şekilde olmalıdır:
-  {"iccid": "786996789"}
-*/
 
 const setAvailable = async (req, res) => {
-  const { iccid } = req.body; // body'de iccid adında bir alan bekliyoruz
+  const { iccid } = req.body;
   if (!iccid) {
     res.status(400).json({ error: "ICCID is required" });
     return;
@@ -124,17 +118,12 @@ const setAvailable = async (req, res) => {
     } else {
       res.json({ message: `ICCID ${iccid} is now available` });
     }
-  }
-  );
+  });
 };
-/*
-  setAvailable body formatı şu şekilde olmalıdır:
-  {"iccid": "786996789"}
-*/
 
 const addIccid = async (req, res) => {
-  const iccids = req.body.iccids; // body'de iccids adında bir array bekliyoruz
-  const iccidType = req.body.type; // body'de iccid_type adında bir alan bekliyoruz
+  const iccids = req.body.iccids;
+  const iccidType = req.body.type;
   if (!iccids || !iccidType) {
     res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
     return;
@@ -154,13 +143,6 @@ const addIccid = async (req, res) => {
   });
 };
 
-/*
-  addIccid body formatı şu şekilde olmalıdır:
-  {"iccids": ["786996789", "67896789", "678476", "56794", "576985679"],
-  "type": "regpre"}
-*/
-
-
 const deleteAll = async (req, res) => {
   const query = `DELETE FROM "public"."iccidTable" WHERE stock = 'sold' or stock = 'reserved'`;
 
@@ -173,6 +155,7 @@ const deleteAll = async (req, res) => {
     res.json({ message: "Reserved ve sold ICCID'ler silindi" });
   });
 };
+
 const resetIccid = async (req, res) => {
   const query = `DELETE FROM "public"."iccidTable";`;
 
@@ -185,7 +168,6 @@ const resetIccid = async (req, res) => {
     res.json({ message: "Tüm ICCID'ler silindi" });
   });
 };
-
 
 const addActivation = async (req, res) => {
   const msisdn = req.body.msisdn;
@@ -241,7 +223,6 @@ const addActivation = async (req, res) => {
   );
 };
 
-
 const getActivations = async (req, res) => {
   const user = req.params.user;
   const query = `SELECT * FROM "public"."activationstable" WHERE "user"='${user} ORDER BY created_at DESC;`
@@ -285,6 +266,32 @@ ORDER BY created_at DESC;
   );
 };
 
+const formatIccid = async (req, res) => {
+  try {
+    const iccidText = req.body; // Text formatında gelen ICCID'leri alıyoruz
+
+    // Kontrol ediyoruz: iccidText bir string mi?
+    if (typeof iccidText !== 'string') {
+      return res.status(400).json({ error: 'iccidText should be a string' });
+    }
+
+    // Metni satır bazında bölüp boşlukları temizliyoruz
+    const iccidArray = iccidText.split(/\r?\n/).map(iccid => iccid.trim()).filter(iccid => iccid !== '');
+
+    // Formatlanmış ICCID verisini oluşturuyoruz
+    const formattedIccids = {
+      iccids: iccidArray,
+      type: 'fonkpos' // veya istediğiniz bir değer
+    };
+
+    // JSON formatında formatlanmış veriyi dönüyoruz
+    res.json(formattedIccids);
+  } catch (error) {
+    console.error("Error in formatIccid function:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   getIccid,
   setSold,
@@ -296,5 +303,6 @@ module.exports = {
   getActivations,
   getActivationsPublic,
   getAllSpesific,
-  resetIccid
+  resetIccid,
+  formatIccid
 };
