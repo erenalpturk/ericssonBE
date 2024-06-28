@@ -105,7 +105,7 @@ const addMernis = async (req, res) => {
     });
 };
 
-const parseMernisData = (input) => {
+const parseMernisData = (input, input2) => {
     const records = input.split('------------------------------------')
                         .map(record => record.trim())
                         .filter(record => record.length > 0);
@@ -125,7 +125,7 @@ const parseMernisData = (input) => {
         return {
             tckn: tckn,
             birth_date: birthDate,
-            type: 'fonkmernis',
+            type: input2,
             stock: 'available'
         };
     });
@@ -133,15 +133,15 @@ const parseMernisData = (input) => {
 
 
 const mernisData = async (req, res) => {
-    try {
-        const data = parseMernisData(req.body);
+    try { console.log(req.params);
+        const data = parseMernisData(req.body,req.params.type);
 
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
             const queryText = 'INSERT INTO "public"."mernisTable" (tckn, birth_date, type, stock) VALUES ($1, $2, $3, $4)';
             for (const record of data) {
-                await client.query(queryText, [record.tckn, record.birth_date, record.type, record.stock]);
+                await client.query(queryText, [record.tckn, record.birth_date,req.params.type, record.stock]);
             }
             await client.query('COMMIT');
         } catch (error) {
