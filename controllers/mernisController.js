@@ -2,7 +2,6 @@ const { Pool } = require("pg");
 const connectionString = process.env.CONNECTION_URL;
 const pool = new Pool({ connectionString });
 
-
 const getMernis = async (req, res) => {
     const type = req.params.type;
     const query = `SELECT tckn, birth_date FROM "public"."mernisTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`;
@@ -44,7 +43,6 @@ const getAll = async (req, res) => {
     );
 };
 
-
 const getAllSpesific = async (req, res) => {
     const type = req.params.type;
     const stock = req.params.stock;
@@ -68,7 +66,7 @@ const getAllSpesific = async (req, res) => {
         }
       }
     );
-  };
+};
 
 const deleteSold = async (req, res) => {
     const query = `DELETE FROM "public"."mernisTable" WHERE stock = 'sold'`;
@@ -107,10 +105,64 @@ const addMernis = async (req, res) => {
     });
 };
 
+const parseMernisData = (input) => {
+    const records = input.split('------------------------------------')
+                        .map(record => record.trim())
+                        .filter(record => record.length > 0);
+
+    return records.map(record => {
+        const lines = record.split('\n').map(line => line.trim());
+        const birthDateLine = lines.find(line => line.startsWith('DOĞUM TARİHİ'));
+        const tcknLine = lines.find(line => line.startsWith('TCKN'));
+
+        let birthDate = birthDateLine.split(':')[1].trim().replace(/\//g, '.');
+
+        // Adjusting the birthDate format to remove leading zeros
+        birthDate = birthDate.split('.').map(part => part.length === 1 ? `0${part}` : part).join('.');
+
+        const tckn = tcknLine.split(':')[1].trim();
+
+        return {
+            tckn: tckn,
+            birth_date: birthDate,
+            type: 'fonkmernis',
+            stock: 'available'
+        };
+    });
+};
+
+
+const mernisData = async (req, res) => {
+    try {
+        const data = parseMernisData(req.body);
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            const queryText = 'INSERT INTO "public"."mernisTable" (tckn, birth_date, type, stock) VALUES ($1, $2, $3, $4)';
+            for (const record of data) {
+                await client.query(queryText, [record.tckn, record.birth_date, record.type, record.stock]);
+            }
+            await client.query('COMMIT');
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+
+        res.status(201).json({ mernisData: data });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
 module.exports = {
     getMernis,
     getAll,
     deleteSold,
     addMernis,
-    getAllSpesific
+    getAllSpesific,
+    mernisData
 };

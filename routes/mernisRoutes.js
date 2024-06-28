@@ -7,5 +7,6 @@ router.post("/deleteSold", mernisController.deleteSold);
 router.post("/getAll", mernisController.getAll);
 router.post("/getAll/:type/:stock", mernisController.getAllSpesific);
 router.post("/addMernis", mernisController.addMernis);
+router.post("/mernisData", mernisController.mernisData); 
 
 module.exports = router;
