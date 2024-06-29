@@ -132,9 +132,15 @@ const setAvailable = async (req, res) => {
   {"iccid": "786996789"}
 */
 
+function formatICCID(input) {
+  let cleanedInput = input.replace(/\s+/g, '');
+  let iccids = cleanedInput.match(/.{1,20}/g);
+  return iccids;
+}
+
 const addIccid = async (req, res) => {
-  const iccids = req.body.iccids; // body'de iccids adında bir array bekliyoruz
-  const iccidType = req.body.type; // body'de iccid_type adında bir alan bekliyoruz
+  const iccids = formatICCID(req.body);
+  const iccidType = req.params.type; 
   if (!iccids || !iccidType) {
     res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
     return;
@@ -152,6 +158,7 @@ const addIccid = async (req, res) => {
     }
     res.json({ message: "ICCID'ler başarıyla eklendi" });
   });
+
 };
 
 /*
@@ -285,6 +292,63 @@ ORDER BY created_at DESC;
   );
 };
 
+const getStats = async (req, res) => {
+  try {
+    const client = await pool.connect();
+
+    // activationsTable genel istatistikleri
+    const activationsCountQuery = 'SELECT COUNT(*) FROM "public"."activationstable"';
+    const activationsCountResult = await client.query(activationsCountQuery);
+    const totalActivations = activationsCountResult.rows[0].count;
+
+    const activationTypesQuery = 'SELECT activationType, COUNT(*) FROM "public"."activationstable" GROUP BY   activationType';
+    const activationTypesResult = await client.query(activationTypesQuery);
+    const activationTypes = activationTypesResult.rows;
+
+    const recentActivationsQuery = 'SELECT COUNT(*) FROM "public"."activationstable" WHERE created_at > NOW() - INTERVAL \'1 days\'';
+    const recentActivationsResult = await client.query(recentActivationsQuery);
+    const recentActivations = recentActivationsResult.rows[0].count;
+
+    // iccidTable genel istatistikleri
+    const iccidCountQuery = 'SELECT COUNT(*) FROM "public"."iccidTable"';
+    const iccidCountResult = await client.query(iccidCountQuery);
+    const totalIccids = iccidCountResult.rows[0].count;
+
+    const iccidStockQuery = 'SELECT stock, COUNT(*) FROM "public"."iccidTable" GROUP BY stock';
+    const iccidStockResult = await client.query(iccidStockQuery);
+    const iccidStock = iccidStockResult.rows;
+
+    // mernisTable genel istatistikleri
+    const mernisCountQuery = 'SELECT COUNT(*) FROM "public"."mernisTable"';
+    const mernisCountResult = await client.query(mernisCountQuery);
+    const totalMernis = mernisCountResult.rows[0].count;
+
+    const mernisTypeQuery = 'SELECT type, COUNT(*) FROM "public"."mernisTable" GROUP BY type';
+    const mernisTypeResult = await client.query(mernisTypeQuery);
+    const mernisTypes = mernisTypeResult.rows;
+
+    client.release();
+
+    res.json({
+      activations: {
+        total: totalActivations,
+        types: activationTypes,
+      },
+      iccids: {
+        total: totalIccids,
+        stock: iccidStock
+      },
+      mernis: {
+        total: totalMernis,
+        types: mernisTypes
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Something went wrong');
+  }
+};
+
 module.exports = {
   getIccid,
   setSold,
@@ -296,5 +360,6 @@ module.exports = {
   getActivations,
   getActivationsPublic,
   getAllSpesific,
-  resetIccid
+  resetIccid,
+  getStats
 };
