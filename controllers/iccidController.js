@@ -236,45 +236,47 @@ const addActivation = async (req, res) => {
 
 const getActivations = async (req, res) => {
   const user = req.params.user;
-  const query = `SELECT * FROM "public"."activationstable" WHERE "user"='${user} ORDER BY created_at DESC;`
-  pool.query(
-    query, (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
-      if (result.rows.length === 0) {
-        res.json({ message: `Datan kalmamış knk` });
-      } else {
-        const data = result.rows;
-        res.json(data);
-      }
+  const query = `SELECT * FROM "public"."activationstable" WHERE "user"=$1 ORDER BY created_at DESC;`;
+  
+  pool.query(query, [user], (error, result) => {
+    if (error) {
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
+      return;
     }
-  );
+    if (result.rows.length === 0) {
+      res.json({ message: `Datan kalmamış knk` });
+    } else {
+      const data = result.rows;
+      res.json(data);
+    }
+  });
 };
 
+
+
 const getActivationsPublic = async (req, res) => {
-  const query = `SELECT *
-FROM public.activationstable
-WHERE "user" NOT IN ('alp', 'enes')
-ORDER BY created_at DESC;
-`
-  pool.query(
-    query, (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
-      if (result.rows.length === 0) {
-        res.json({ message: `Datan kalmamış knk` });
-      } else {
-        const data = result.rows;
-        res.json(data);
-      }
+  const query = `
+    SELECT * FROM public.activationstable
+    WHERE "user" NOT IN ($1, $2)
+    ORDER BY created_at DESC;
+  `;
+  
+  const excludedUsers = ['alp', 'enes'];
+
+  pool.query(query, excludedUsers, (error, result) => {
+    if (error) {
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
+      return;
     }
-  );
+    if (result.rows.length === 0) {
+      res.json({ message: `Datan kalmamış knk` });
+    } else {
+      const data = result.rows;
+      res.json(data);
+    }
+  });
 };
 
 //DB YE EKLEMEZ SADECE FORMATLAR :* :*
