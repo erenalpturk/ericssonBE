@@ -10,7 +10,7 @@ router.post("/getAll/:type/:stock", iccidController.getAllSpesific);
 router.post("/getAll", iccidController.getAll);
 router.post("/deleteAll", iccidController.deleteAll);
 router.post("/resetIccid", iccidController.resetIccid);
-router.post("/getStats", iccidController.getStats);
+router.get("/getStats", iccidController.getStats);
 router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);
 router.post("/enesvealpdatalarinizigetiriyor", iccidController.getActivationsPublic);
 router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
