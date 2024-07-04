@@ -7,7 +7,7 @@ const pool = new Pool({ connectionString });
 const getIccid = async (req, res) => {
   const type = req.params.type;
   const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`;
-  
+
   pool.query(query, (error, result) => {
     if (error) {
       console.error("Error executing query", error);
@@ -133,7 +133,7 @@ function formatICCID(input) {
 
 const addIccid = async (req, res) => {
   const iccids = formatICCID(req.body);
-  const iccidType = req.params.type; 
+  const iccidType = req.params.type;
   if (!iccids || !iccidType) {
     res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
     return;
@@ -237,7 +237,7 @@ const addActivation = async (req, res) => {
 const getActivations = async (req, res) => {
   const user = req.params.user;
   const query = `SELECT * FROM "public"."activationstable" WHERE "user"=$1 ORDER BY created_at DESC;`;
-  
+
   pool.query(query, [user], (error, result) => {
     if (error) {
       console.error("Error executing query", error);
@@ -261,7 +261,7 @@ const getActivationsPublic = async (req, res) => {
     WHERE "user" NOT IN ($1, $2)
     ORDER BY created_at DESC;
   `;
-  
+
   const excludedUsers = ['alp', 'enes'];
 
   pool.query(query, excludedUsers, (error, result) => {
@@ -376,7 +376,7 @@ const getStats = async (req, res) => {
     const activationsCountResult = await client.query(activationsCountQuery);
     const totalActivations = activationsCountResult.rows[0].count;
 
-    const activationTypesQuery = 'SELECT activationType, COUNT(*) FROM "public"."activationstable" GROUP BY   activationType';
+    const activationTypesQuery = 'SELECT activationType, COUNT(*) FROM "public"."activationstable" GROUP BY activationType';
     const activationTypesResult = await client.query(activationTypesQuery);
     const activationTypes = activationTypesResult.rows;
 
@@ -398,7 +398,7 @@ const getStats = async (req, res) => {
     const mernisCountResult = await client.query(mernisCountQuery);
     const totalMernis = mernisCountResult.rows[0].count;
 
-    const mernisTypeQuery = 'SELECT type, COUNT(*) FROM "public"."mernisTable" GROUP BY type';
+    const mernisTypeQuery = 'SELECT stock, COUNT(*) FROM "public"."mernisTable" GROUP BY stock';
     const mernisTypeResult = await client.query(mernisTypeQuery);
     const mernisTypes = mernisTypeResult.rows;
 
@@ -424,6 +424,23 @@ const getStats = async (req, res) => {
   }
 };
 
+
+const reservedToAvailable = async (req, res) => {
+  pool.query(
+    `UPDATE "public"."iccidTable"
+    SET stock = 'available' 
+    WHERE stock = 'reserved'`,
+    (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+      res.json({ message: `${result.rowCount} reserved entries changed to available` });
+    }
+  );
+};
+
 module.exports = {
   getIccid,
   setSold,
@@ -438,5 +455,6 @@ module.exports = {
   resetIccid,
   formatIccid,
   formatAndInsertIccids,
-  getStats
+  getStats,
+  reservedToAvailable
 };
