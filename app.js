@@ -24,7 +24,7 @@ app.use(express.text()); // Burada `express.text()` middleware'ini ekliyoruz
 app.use('/iccid', iccidRoutes);
 app.use('/mernis', mernisRoutes);
 
-const PORT = 3050;
+const PORT = 5432;
 app.listen(PORT, () => {
     connectDB();
     console.log(`Server is running on http://localhost:${PORT}`);
