@@ -20,11 +20,39 @@ const getIccid = async (req, res) => {
       const iccid = result.rows[0].iccid;
       res.json(iccid);
       pool.query(
-        `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}'`
+        `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}'`,
+        (err) => {
+          if (err) {
+            console.error("Error updating stock", err);
+            return;
+          }
+
+          // 5 dakika (300000 ms) sonra durumu kontrol eden zamanlayıcı
+          setTimeout(async () => {
+            const checkQuery = `SELECT stock FROM "public"."iccidTable" WHERE iccid = '${iccid}' AND stock = 'reserved';`;
+            pool.query(checkQuery, (checkError, checkResult) => {
+              if (checkError) {
+                console.error("Error checking reserved stock", checkError);
+                return;
+              }
+              if (checkResult.rows.length > 0) {
+                pool.query(
+                  `UPDATE "public"."iccidTable" SET stock = 'available' WHERE iccid = '${iccid}'`,
+                  (updateError) => {
+                    if (updateError) {
+                      console.error("Error setting stock to available", updateError);
+                    } else {
+                      console.log(`ICCID ${iccid} is now available again`);
+                    }
+                  }
+                );
+              }
+            });
+          }, 300000); // 5 dakika
+        }
       );
     }
-  });
-};
+  })};
 
 const getAllSpesific = async (req, res) => {
   const type = req.params.type;
