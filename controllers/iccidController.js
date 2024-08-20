@@ -6,53 +6,81 @@ const pool = new Pool({ connectionString });
 
 const getIccid = async (req, res) => {
   const type = req.params.type;
-  const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`;
 
-  pool.query(query, (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
-    } else {
-      const iccid = result.rows[0].iccid;
-      res.json(iccid);
-      pool.query(
-        `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}'`,
-        (err) => {
-          if (err) {
-            console.error("Error updating stock", err);
-            return;
-          }
+  try {
+    // Parametreleri almak için sorgu
+    const paramQuery = `SELECT param_name, param_value FROM "public"."gnl_parm" WHERE param_name IN ('reservation_timeout', 'reservation_enabled');`;
+    const paramResult = await pool.query(paramQuery);
+    
+    // Parametreleri harita (map) olarak alalım
+    const params = {};
+    paramResult.rows.forEach(row => {
+      params[row.param_name] = row.param_value;
+    });
 
-          // 5 dakika (300000 ms) sonra durumu kontrol eden zamanlayıcı
-          setTimeout(async () => {
-            const checkQuery = `SELECT stock FROM "public"."iccidTable" WHERE iccid = '${iccid}' AND stock = 'reserved';`;
-            pool.query(checkQuery, (checkError, checkResult) => {
-              if (checkError) {
-                console.error("Error checking reserved stock", checkError);
-                return;
-              }
-              if (checkResult.rows.length > 0) {
-                pool.query(
-                  `UPDATE "public"."iccidTable" SET stock = 'available' WHERE iccid = '${iccid}'`,
-                  (updateError) => {
-                    if (updateError) {
-                      console.error("Error setting stock to available", updateError);
-                    } else {
-                      console.log(`ICCID ${iccid} is now available again`);
-                    }
+    const reservationTimeout = parseInt(params['reservation_timeout'], 10);
+    const reservationEnabled = params['reservation_enabled'] === 'true';
+
+    // ICCID sorgusu
+    const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`;
+    pool.query(query, (error, result) => {
+      if (error) {
+        console.error("Error executing query", error);
+        res.status(500).json({ error: "Internal Server Error" });
+        return;
+      }
+      if (result.rows.length === 0) {
+        res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
+      } else {
+        const iccid = result.rows[0].iccid;
+        res.json(iccid);
+
+        pool.query(
+          `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}' and type= '${type}'`,
+          (err) => {
+            if (err) {
+              console.error("Error updating stock", err);
+              return;
+            }
+
+            // Eğer reservationEnabled true ise zamanlayıcıyı başlat
+            if (reservationEnabled) {
+              setTimeout(async () => {
+                const checkQuery = `SELECT stock FROM "public"."iccidTable" WHERE iccid = '${iccid}' AND stock = 'reserved';`;
+                pool.query(checkQuery, (checkError, checkResult) => {
+                  if (checkError) {
+                    console.error("Error checking reserved stock", checkError);
+                    return;
                   }
-                );
-              }
-            });
-          }, 300000); // 5 dakika
-        }
-      );
-    }
-  })};
+                  if (checkResult.rows.length > 0) {
+                    pool.query(
+                      `UPDATE "public"."iccidTable" SET stock = 'available' WHERE iccid = '${iccid}'`,
+                      (updateError) => {
+                        if (updateError) {
+                          console.error("Error setting stock to available", updateError);
+                        } else {
+                          console.log(`ICCID ${iccid} is now available again`);
+                        }
+                      }
+                    );
+                  }
+                });
+              }, reservationTimeout); // Dinamik olarak reservationTimeout'u kullan
+            } else {
+              console.log("Reservation timeout is disabled.");
+            }
+          }
+        );
+      }
+    });
+  } catch (err) {
+    console.error("Error retrieving parameters", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
+
 
 const getAllSpesific = async (req, res) => {
   const type = req.params.type;
