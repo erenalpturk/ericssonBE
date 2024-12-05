@@ -251,7 +251,7 @@ const addActivation = async (req, res) => {
         return;
       }
 
-      
+     
         if (!msisdn) {
           res.status(400).json({ error: "msisdn alanı doldurulmadı" });
           return;
@@ -280,7 +280,7 @@ const addActivation = async (req, res) => {
           res.json({ message: "Data Db'ye başarıyla eklendi" });
         });
       }
-    }
+  
   );
 };
 
