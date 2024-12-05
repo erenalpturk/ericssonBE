@@ -6,18 +6,16 @@ const pool = new Pool({ connectionString });
 
 const getIccid = async (req, res) => {
   const type = req.params.type;
-
   try {
     // Parametreleri almak için sorgu
     const paramQuery = `SELECT param_name, param_value FROM "public"."gnl_parm" WHERE param_name IN ('reservation_timeout', 'reservation_enabled');`;
     const paramResult = await pool.query(paramQuery);
-    
+
     // Parametreleri harita (map) olarak alalım
     const params = {};
     paramResult.rows.forEach(row => {
       params[row.param_name] = row.param_value;
     });
-
     const reservationTimeout = parseInt(params['reservation_timeout'], 10);
     const reservationEnabled = params['reservation_enabled'] === 'true';
 
@@ -65,7 +63,7 @@ const getIccid = async (req, res) => {
                     );
                   }
                 });
-              }, reservationTimeout); // Dinamik olarak reservationTimeout'u kullan
+              }, 300000); // Dinamik olarak reservationTimeout'u kullan
             } else {
               console.log("Reservation timeout is disabled.");
             }
@@ -253,10 +251,7 @@ const addActivation = async (req, res) => {
         return;
       }
 
-      if (result.rows.length > 0) {
-        res.status(400).json({ error: "Bu MSISDN zaten kayıtlı" });
-        return;
-      } else {
+      
         if (!msisdn) {
           res.status(400).json({ error: "msisdn alanı doldurulmadı" });
           return;
@@ -282,7 +277,6 @@ const addActivation = async (req, res) => {
             res.status(500).json({ error: "Internal Server Error" });
             return;
           }
-
           res.json({ message: "Data Db'ye başarıyla eklendi" });
         });
       }
