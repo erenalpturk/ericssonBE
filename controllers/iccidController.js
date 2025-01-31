@@ -1,183 +1,173 @@
 // iccidController.js
+const { createClient } = require('@supabase/supabase-js');
 
-const { Pool } = require("pg");
-const connectionString = process.env.CONNECTION_URL;
-const pool = new Pool({ connectionString });
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const getIccid = async (req, res) => {
   const type = req.params.type;
   try {
-    // Parametreleri almak için sorgu
-    const paramQuery = `SELECT param_name, param_value FROM "public"."gnl_parm" WHERE param_name IN ('reservation_timeout', 'reservation_enabled');`;
-    const paramResult = await pool.query(paramQuery);
+    // Get parameters from gnl_parm table
+    const { data: paramData, error: paramError } = await supabase
+      .from('gnl_parm')
+      .select('param_name, param_value')
+      .in('param_name', ['reservation_timeout', 'reservation_enabled']);
 
-    // Parametreleri harita (map) olarak alalım
+    if (paramError) throw paramError;
+
     const params = {};
-    paramResult.rows.forEach(row => {
+    paramData.forEach(row => {
       params[row.param_name] = row.param_value;
     });
+    
     const reservationTimeout = parseInt(params['reservation_timeout'], 10);
     const reservationEnabled = params['reservation_enabled'] === 'true';
 
-    // ICCID sorgusu
-    const query = `SELECT iccid FROM "public"."iccidTable" WHERE stock = 'available' and type= '${type}' LIMIT 1;`;
-    pool.query(query, (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
+    // Get available ICCID
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('iccid')
+      .eq('stock', 'available')
+      .eq('type', type)
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
       }
-      if (result.rows.length === 0) {
-        res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
-      } else {
-        const iccid = result.rows[0].iccid;
-        res.json(iccid);
+      throw error;
+    }
 
-        pool.query(
-          `UPDATE "public"."iccidTable" SET stock= 'reserved' WHERE iccid = '${iccid}' and type= '${type}'`,
-          (err) => {
-            if (err) {
-              console.error("Error updating stock", err);
-              return;
-            }
+    const iccid = data.iccid;
+    
+    // Update stock to reserved
+    const { error: updateError } = await supabase
+      .from('iccidTable')
+      .update({ stock: 'reserved' })
+      .eq('iccid', iccid)
+      .eq('type', type);
 
-            // Eğer reservationEnabled true ise zamanlayıcıyı başlat
-            if (reservationEnabled) {
-              setTimeout(async () => {
-                const checkQuery = `SELECT stock FROM "public"."iccidTable" WHERE iccid = '${iccid}' AND stock = 'reserved';`;
-                pool.query(checkQuery, (checkError, checkResult) => {
-                  if (checkError) {
-                    console.error("Error checking reserved stock", checkError);
-                    return;
-                  }
-                  if (checkResult.rows.length > 0) {
-                    pool.query(
-                      `UPDATE "public"."iccidTable" SET stock = 'available' WHERE iccid = '${iccid}'`,
-                      (updateError) => {
-                        if (updateError) {
-                          console.error("Error setting stock to available", updateError);
-                        } else {
-                          console.log(`ICCID ${iccid} is now available again`);
-                        }
-                      }
-                    );
-                  }
-                });
-              }, 300000); // Dinamik olarak reservationTimeout'u kullan
-            } else {
-              console.log("Reservation timeout is disabled.");
-            }
+    if (updateError) throw updateError;
+
+    res.json(iccid);
+
+    // Handle reservation timeout
+    if (reservationEnabled) {
+      setTimeout(async () => {
+        const { data: checkData } = await supabase
+          .from('iccidTable')
+          .select('stock')
+          .eq('iccid', iccid)
+          .eq('stock', 'reserved')
+          .single();
+
+        if (checkData) {
+          const { error: resetError } = await supabase
+            .from('iccidTable')
+            .update({ stock: 'available' })
+            .eq('iccid', iccid);
+
+          if (resetError) {
+            console.error("Error setting stock to available", resetError);
+          } else {
+            console.log(`ICCID ${iccid} is now available again`);
           }
-        );
-      }
-    });
+        }
+      }, reservationTimeout || 300000);
+    }
   } catch (err) {
-    console.error("Error retrieving parameters", err);
+    console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-
-
-
 const getAllSpesific = async (req, res) => {
-  const type = req.params.type;
-  const stock = req.params.stock;
-  pool.query(
-    `SELECT * FROM "public"."iccidTable" WHERE type = '${type}' AND stock = '${stock}'`,
-    (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
+  const { type, stock } = req.params;
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('*')
+      .eq('type', type)
+      .eq('stock', stock);
 
-      if (result.rows.length === 0) {
-        res.json({ message: `${type} türünde ${stock} ICCID kalmamış knk` });
-      } else {
-        res.json({
-          message: `${result.rows.length} adet ${type} türünde ${stock} ICCID bulundu`,
-          data: result.rows
-        });
-      }
+    if (error) throw error;
+
+    if (data.length === 0) {
+      res.json({ message: `${type} türünde ${stock} ICCID kalmamış knk` });
+    } else {
+      res.json({
+        message: `${data.length} adet ${type} türünde ${stock} ICCID bulundu`,
+        data: data
+      });
     }
-  );
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const getAll = async (req, res) => {
-  pool.query(
-    `SELECT * FROM "public"."iccidTable"`,
-    (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('*');
 
-      if (result.rows.length === 0) {
-        res.json({ message: "ICCID kalmamış knk" });
-      } else {
-        res.json(result.rows);
-      }
+    if (error) throw error;
+
+    if (data.length === 0) {
+      res.json({ message: "ICCID kalmamış knk" });
+    } else {
+      res.json(data);
     }
-  );
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const setSold = async (req, res) => {
   const { iccid } = req.body;
   if (!iccid) {
-    res.status(400).json({ error: "ICCID is required" });
-    return;
+    return res.status(400).json({ error: "ICCID is required" });
   }
-  const query = `
-    UPDATE "public"."iccidTable"
-    SET stock = 'sold'
-    WHERE iccid = $1;
-  `;
-  pool.query(query, [iccid], (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: "ICCID not found" });
-    } else {
-      res.json({ message: `ICCID ${iccid} has been sold` });
-    }
-  });
+  try {
+    const { error } = await supabase
+      .from('iccidTable')
+      .update({ stock: 'sold' })
+      .eq('iccid', iccid);
+
+    if (error) throw error;
+
+    res.json({ message: `ICCID ${iccid} has been sold` });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const setAvailable = async (req, res) => {
   const { iccid } = req.body;
   if (!iccid) {
-    res.status(400).json({ error: "ICCID is required" });
-    return;
+    return res.status(400).json({ error: "ICCID is required" });
   }
-  const query = `
-    UPDATE "public"."iccidTable"
-    SET stock = 'available'
-    WHERE iccid = $1;
-  `;
-  pool.query(query, [iccid], (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: "ICCID not found" });
-    } else {
-      res.json({ message: `ICCID ${iccid} is now available` });
-    }
-  });
+  try {
+    const { error } = await supabase
+      .from('iccidTable')
+      .update({ stock: 'available' })
+      .eq('iccid', iccid);
+
+    if (error) throw error;
+
+    res.json({ message: `ICCID ${iccid} is now available` });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
-/*
-  setAvailable body formatı şu şekilde olmalıdır:
-  {"iccid": "786996789"}
-*/
 
 function formatICCID(input) {
   let cleanedInput = input.replace(/\s+/g, '');
@@ -188,271 +178,183 @@ function formatICCID(input) {
 const addIccid = async (req, res) => {
   const iccids = formatICCID(req.body);
   const iccidType = req.params.type;
+  
   if (!iccids || !iccidType) {
-    res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
-    return;
+    return res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
   }
-  const values = iccids.map(iccid => `('${iccid}', 'available', '${iccidType}')`).join(',');
-  const query = `
-    INSERT INTO "public"."iccidTable" (iccid, stock, type)
-    VALUES ${values};
-  `;
-  pool.query(query, (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
-    res.json({ message: "ICCID'ler başarıyla eklendi" });
-  });
 
+  try {
+    const iccidData = iccids.map(iccid => ({
+      iccid,
+      stock: 'available',
+      type: iccidType
+    }));
+
+    const { error } = await supabase
+      .from('iccidTable')
+      .insert(iccidData);
+
+    if (error) throw error;
+
+    res.json({ message: "ICCID'ler başarıyla eklendi" });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const deleteAll = async (req, res) => {
-  const query = `DELETE FROM "public"."iccidTable" WHERE stock = 'sold' or stock = 'reserved'`;
+  try {
+    const { error } = await supabase
+      .from('iccidTable')
+      .delete()
+      .in('stock', ['sold', 'reserved']);
 
-  pool.query(query, (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
+    if (error) throw error;
+
     res.json({ message: "Reserved ve sold ICCID'ler silindi" });
-  });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const resetIccid = async (req, res) => {
-  const query = `DELETE FROM "public"."iccidTable";`;
+  try {
+    const { error } = await supabase
+      .from('iccidTable')
+      .delete()
+      .neq('iccid', ''); // Delete all records
 
-  pool.query(query, (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
+    if (error) throw error;
+
     res.json({ message: "Tüm ICCID'ler silindi" });
-  });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const addActivation = async (req, res) => {
-  const msisdn = req.body.msisdn;
-  const tckn = req.body.tckn;
-  const birth_date = req.body.birth_date;
-  const activationType = req.body.activationtype;
-  const user = req.body.user;
+  const { msisdn, tckn, birth_date, activationType, user } = req.body;
 
-  pool.query(
-    `SELECT * FROM "public"."activationstable" WHERE msisdn = $1`,
-    [msisdn],
-    (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
+  if (!msisdn || !tckn || !birth_date || !activationType) {
+    return res.status(400).json({ 
+      error: `${!msisdn ? 'msisdn' : !tckn ? 'tckn' : !birth_date ? 'birth_date' : 'activationType'} alanı doldurulmadı` 
+    });
+  }
 
-     
-        if (!msisdn) {
-          res.status(400).json({ error: "msisdn alanı doldurulmadı" });
-          return;
-        } else if (!tckn) {
-          res.status(400).json({ error: "tckn alanı doldurulmadı" });
-          return;
-        } else if (!birth_date) {
-          res.status(400).json({ error: "birth_date alanı doldurulmadı" });
-          return;
-        } else if (!activationType) {
-          res.status(400).json({ error: "activationType alanı doldurulmadı" });
-          return;
-        }
+  try {
+    const { error } = await supabase
+      .from('activationstable')
+      .insert([{
+        msisdn,
+        tckn,
+        birth_date,
+        activationType,
+        user,
+        created_at: new Date().toISOString()
+      }]);
 
-        const query = `
-          INSERT INTO "public"."activationstable" (msisdn, tckn, birth_date, activationType, "user", created_at)
-          VALUES ($1, $2, $3, $4, $5, NOW() AT TIME ZONE 'Europe/Istanbul')
-        `;
+    if (error) throw error;
 
-        pool.query(query, [msisdn, tckn, birth_date, activationType, user], (error, result) => {
-          if (error) {
-            console.error("Error executing query", error);
-            res.status(500).json({ error: "Internal Server Error" });
-            return;
-          }
-          res.json({ message: "Data Db'ye başarıyla eklendi" });
-        });
-      }
-  
-  );
+    res.json({ message: "Data Db'ye başarıyla eklendi" });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const getActivations = async (req, res) => {
-  const user = req.params.user;
-  const query = `SELECT * FROM "public"."activationstable" WHERE "user"=$1 ORDER BY created_at DESC;`;
+  const { user } = req.params;
+  
+  try {
+    const { data, error } = await supabase
+      .from('activationstable')
+      .select('*')
+      .eq('user', user)
+      .order('created_at', { ascending: false });
 
-  pool.query(query, [user], (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
-    if (result.rows.length === 0) {
-      res.json({ message: `Datan kalmamış knk` });
+    if (error) throw error;
+
+    if (data.length === 0) {
+      res.json({ message: "Datan kalmamış knk" });
     } else {
-      const data = result.rows;
       res.json(data);
     }
-  });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
-
-
 
 const getActivationsPublic = async (req, res) => {
-  const query = `
-    SELECT * FROM public.activationstable
-    WHERE "user" NOT IN ($1, $2)
-    ORDER BY created_at DESC;
-  `;
+  try {
+    const { data, error } = await supabase
+      .from('activationstable')
+      .select('*')
+      .not('user', 'in', ['alp', 'enes'])
+      .order('created_at', { ascending: false });
 
-  const excludedUsers = ['alp', 'enes'];
+    if (error) throw error;
 
-  pool.query(query, excludedUsers, (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
-    if (result.rows.length === 0) {
-      res.json({ message: `Datan kalmamış knk` });
+    if (data.length === 0) {
+      res.json({ message: "Datan kalmamış knk" });
     } else {
-      const data = result.rows;
       res.json(data);
     }
-  });
-};
-
-//DB YE EKLEMEZ SADECE FORMATLAR :* :*
-const formatIccid = async (req, res) => {
-  try {
-    const iccidText = req.body; // Text formatında gelen ICCID'leri alıyoruz
-
-    // Kontrol ediyoruz: iccidText bir string mi?
-    if (typeof iccidText !== 'string') {
-      return res.status(400).json({ error: 'iccidText should be a string' });
-    }
-
-    // Metni satır bazında bölüp boşlukları temizliyoruz
-    const iccidArray = iccidText.split(/\r?\n/).map(iccid => iccid.trim()).filter(iccid => iccid !== '');
-
-    // Formatlanmış ICCID verisini oluşturuyoruz
-    const formattedIccids = {
-      iccids: iccidArray,
-      type: 'fonkpos' // veya istediğiniz bir değer
-    };
-
-    // JSON formatında formatlanmış veriyi dönüyoruz
-    res.json(formattedIccids);
-  } catch (error) {
-    console.error("Error in formatIccid function:", error);
+  } catch (err) {
+    console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
-//PARAMETRESİNİ NE İLETİRSEN O ŞEKİLDE FORMATLAR DB EKLER
-const formatAndInsertIccids = async (req, res) => {
-  try {
-    const iccidText = req.body; // Text formatında gelen ICCID'leri alıyoruz
-
-    // Kontrol ediyoruz: iccidText bir string mi?
-    if (typeof iccidText !== 'string') {
-      return res.status(400).json({ error: 'iccidText should be a string' });
-    }
-
-    // Metni satır bazında bölüp boşlukları temizliyoruz
-    const iccidArray = iccidText.split(/\r?\n/).map(iccid => iccid.trim()).filter(iccid => iccid !== '');
-
-    // Type parametresini alıyoruz
-    const type = req.params.type || 'defaultType'; // varsayılan type belirlenebilir
-
-    // Formatlanmış ICCID verisini oluşturuyoruz
-    const formattedIccids = {
-      iccids: iccidArray,
-      type: type
-    };
-
-    // Insert işlemi için hazırlanan veriler
-    const iccidsToInsert = {
-      iccids: formattedIccids.iccids,
-      type: formattedIccids.type
-    };
-
-    // Veritabanına eklemek için addIccidToDatabase fonksiyonunu çağırıyoruz
-    addIccidToDatabase(iccidsToInsert, res);
-
-  } catch (error) {
-    console.error("Error in formatAndInsertIccids function:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-
-// Veritabanına ekleme fonksiyonu
-const addIccidToDatabase = (iccidsToInsert, res) => {
-  const { iccids, type } = iccidsToInsert;
-  if (!iccids || !type) {
-    res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
-    return;
-  }
-  const values = iccids.map(iccid => `('${iccid}', 'available', '${type}')`).join(',');
-  const query = `
-    INSERT INTO "public"."iccidTable" (iccid, stock, type)
-    VALUES ${values};
-  `;
-  pool.query(query, (error, result) => {
-    if (error) {
-      console.error("Error executing query", error);
-      res.status(500).json({ error: "Internal Server Error" });
-      return;
-    }
-    res.json({ message: "ICCID'ler başarıyla eklendi" });
-  });
-};
-
 
 const getStats = async (req, res) => {
   try {
-    const client = await pool.connect();
+    // Get activations statistics
+    const { data: activationsData, error: activationsError } = await supabase
+      .from('activationstable')
+      .select('activationType');
+    
+    if (activationsError) throw activationsError;
 
-    // activationsTable genel istatistikleri
-    const activationsCountQuery = 'SELECT COUNT(*) FROM "public"."activationstable"';
-    const activationsCountResult = await client.query(activationsCountQuery);
-    const totalActivations = activationsCountResult.rows[0].count;
+    const totalActivations = activationsData.length;
+    
+    // Group by activationType
+    const activationTypes = activationsData.reduce((acc, curr) => {
+      acc[curr.activationType] = (acc[curr.activationType] || 0) + 1;
+      return acc;
+    }, {});
 
-    const activationTypesQuery = 'SELECT activationType, COUNT(*) FROM "public"."activationstable" GROUP BY activationType';
-    const activationTypesResult = await client.query(activationTypesQuery);
-    const activationTypes = activationTypesResult.rows;
+    // Get ICCID statistics
+    const { data: iccidData, error: iccidError } = await supabase
+      .from('iccidTable')
+      .select('stock');
+    
+    if (iccidError) throw iccidError;
 
-    const recentActivationsQuery = 'SELECT COUNT(*) FROM "public"."activationstable" WHERE created_at > NOW() - INTERVAL \'1 days\'';
-    const recentActivationsResult = await client.query(recentActivationsQuery);
-    const recentActivations = recentActivationsResult.rows[0].count;
+    const totalIccids = iccidData.length;
+    
+    // Group by stock status
+    const iccidStock = iccidData.reduce((acc, curr) => {
+      acc[curr.stock] = (acc[curr.stock] || 0) + 1;
+      return acc;
+    }, {});
 
-    // iccidTable genel istatistikleri
-    const iccidCountQuery = 'SELECT COUNT(*) FROM "public"."iccidTable"';
-    const iccidCountResult = await client.query(iccidCountQuery);
-    const totalIccids = iccidCountResult.rows[0].count;
+    // Get Mernis statistics
+    const { data: mernisData, error: mernisError } = await supabase
+      .from('mernisTable')
+      .select('stock');
+    
+    if (mernisError) throw mernisError;
 
-    const iccidStockQuery = 'SELECT stock, COUNT(*) FROM "public"."iccidTable" GROUP BY stock';
-    const iccidStockResult = await client.query(iccidStockQuery);
-    const iccidStock = iccidStockResult.rows;
-
-    // mernisTable genel istatistikleri
-    const mernisCountQuery = 'SELECT COUNT(*) FROM "public"."mernisTable"';
-    const mernisCountResult = await client.query(mernisCountQuery);
-    const totalMernis = mernisCountResult.rows[0].count;
-
-    const mernisTypeQuery = 'SELECT stock, COUNT(*) FROM "public"."mernisTable" GROUP BY stock';
-    const mernisTypeResult = await client.query(mernisTypeQuery);
-    const mernisTypes = mernisTypeResult.rows;
-
-    client.release();
+    const totalMernis = mernisData.length;
+    
+    // Group by stock status
+    const mernisTypes = mernisData.reduce((acc, curr) => {
+      acc[curr.stock] = (acc[curr.stock] || 0) + 1;
+      return acc;
+    }, {});
 
     res.json({
       activations: {
@@ -469,26 +371,84 @@ const getStats = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Something went wrong');
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-
 const reservedToAvailable = async (req, res) => {
-  pool.query(
-    `UPDATE "public"."iccidTable"
-    SET stock = 'available' 
-    WHERE stock = 'reserved'`,
-    (error, result) => {
-      if (error) {
-        console.error("Error executing query", error);
-        res.status(500).json({ error: "Internal Server Error" });
-        return;
-      }
-      res.json({ message: `${result.rowCount} reserved entries changed to available` });
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .update({ stock: 'available' })
+      .eq('stock', 'reserved');
+
+    if (error) throw error;
+
+    res.json({ message: `Reserved entries changed to available` });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// Format ICCID helper function
+const formatIccid = async (req, res) => {
+  try {
+    const iccidText = req.body;
+    
+    if (typeof iccidText !== 'string') {
+      return res.status(400).json({ error: 'iccidText should be a string' });
     }
-  );
+
+    const iccidArray = iccidText.split(/\r?\n/)
+      .map(iccid => iccid.trim())
+      .filter(iccid => iccid !== '');
+
+    const formattedIccids = {
+      iccids: iccidArray,
+      type: 'fonkpos'
+    };
+
+    res.json(formattedIccids);
+  } catch (error) {
+    console.error("Error in formatIccid function:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// Format and insert ICCIDs
+const formatAndInsertIccids = async (req, res) => {
+  try {
+    const iccidText = req.body;
+    
+    if (typeof iccidText !== 'string') {
+      return res.status(400).json({ error: 'iccidText should be a string' });
+    }
+
+    const iccidArray = iccidText.split(/\r?\n/)
+      .map(iccid => iccid.trim())
+      .filter(iccid => iccid !== '');
+
+    const type = req.params.type || 'defaultType';
+    
+    const iccidsToInsert = iccidArray.map(iccid => ({
+      iccid: iccid,
+      stock: 'available',
+      type: type
+    }));
+
+    const { error } = await supabase
+      .from('iccidTable')
+      .insert(iccidsToInsert);
+
+    if (error) throw error;
+
+    res.json({ message: "ICCID'ler başarıyla eklendi" });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 module.exports = {
@@ -503,8 +463,8 @@ module.exports = {
   getActivationsPublic,
   getAllSpesific,
   resetIccid,
-  formatIccid,
-  formatAndInsertIccids,
   getStats,
-  reservedToAvailable
+  reservedToAvailable,
+  formatIccid,
+  formatAndInsertIccids
 };
