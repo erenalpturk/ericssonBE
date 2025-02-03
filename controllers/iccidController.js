@@ -236,9 +236,9 @@ const resetIccid = async (req, res) => {
 };
 
 const addActivation = async (req, res) => {
-  const { msisdn, tckn, birth_date, activationType, user } = req.body;
-
-  if (!msisdn || !tckn || !birth_date || !activationType) {
+  const { msisdn, tckn, birth_date, activationtype, user } = req.body;
+console.log(req.body);
+  if (!msisdn || !tckn || !birth_date || !activationtype) {
     return res.status(400).json({ 
       error: `${!msisdn ? 'msisdn' : !tckn ? 'tckn' : !birth_date ? 'birth_date' : 'activationType'} alanı doldurulmadı` 
     });
@@ -251,7 +251,7 @@ const addActivation = async (req, res) => {
         msisdn,
         tckn,
         birth_date,
-        activationType,
+        activationtype,
         user,
         created_at: new Date().toISOString()
       }]);
