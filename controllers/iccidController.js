@@ -6,6 +6,7 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const getIccid = async (req, res) => {
+  console.log(req.params.type);
   const type = req.params.type;
   try {
     // Get parameters from gnl_parm table
@@ -82,6 +83,20 @@ const getIccid = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const getAllSpesific = async (req, res) => {
   const { type, stock } = req.params;
@@ -293,9 +308,8 @@ const getActivationsPublic = async (req, res) => {
     const { data, error } = await supabase
       .from('activationstable')
       .select('*')
-      .not('user', 'in', ['alp', 'enes'])
+      .not('user', 'in', '(alp, enes)')
       .order('created_at', { ascending: false });
-
     if (error) throw error;
 
     if (data.length === 0) {
@@ -451,6 +465,32 @@ const formatAndInsertIccids = async (req, res) => {
   }
 };
 
+const bulkDelete = async (req, res) => {
+  const { iccids } = req.body;
+  
+  if (!Array.isArray(iccids) || iccids.length === 0) {
+    return res.status(400).json({ error: 'Geçerli ICCID listesi gönderilmedi' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .delete()
+      .in('iccid', iccids)
+      .select();
+
+    if (error) throw error;
+    
+    res.json({ 
+      message: `${data.length} ICCID başarıyla silindi`,
+      deletedIccids: data 
+    });
+  } catch (error) {
+    console.error('ICCID silme hatası:', error);
+    res.status(500).json({ error: 'ICCID silinirken bir hata oluştu' });
+  }
+};
+
 module.exports = {
   getIccid,
   setSold,
@@ -466,5 +506,6 @@ module.exports = {
   getStats,
   reservedToAvailable,
   formatIccid,
-  formatAndInsertIccids
+  formatAndInsertIccids,
+  bulkDelete
 };
