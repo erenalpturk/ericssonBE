@@ -7,6 +7,7 @@ router.post("/getIccid/:type", iccidController.getIccid);
 router.post("/setSold", iccidController.setSold);
 router.post("/setAvailable", iccidController.setAvailable);
 router.post("/reservedToAvailable", iccidController.reservedToAvailable);
+router.post("/setStatus", iccidController.setStatus);
 
 // Bulk Operations
 router.post("/addIccid/:type", iccidController.addIccid);

@@ -21,7 +21,7 @@ const getIccid = async (req, res) => {
     paramData.forEach(row => {
       params[row.param_name] = row.param_value;
     });
-    
+
     const reservationTimeout = parseInt(params['reservation_timeout'], 10);
     const reservationEnabled = params['reservation_enabled'] === 'true';
 
@@ -42,7 +42,7 @@ const getIccid = async (req, res) => {
     }
 
     const iccid = data.iccid;
-    
+
     // Update stock to reserved
     const { error: updateError } = await supabase
       .from('iccidTable')
@@ -83,19 +83,6 @@ const getIccid = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 const getAllSpesific = async (req, res) => {
@@ -184,6 +171,35 @@ const setAvailable = async (req, res) => {
   }
 };
 
+const setStatus = async (req, res) => {
+  const { iccid, status } = req.body;
+
+  if (!iccid || !status) {
+    return res.status(400).json({ error: "ICCID and status are required" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .update({ stock: status })
+      .eq('iccid', iccid)
+      .select();   // güncellenen satırları almak için ekle
+
+if (error) throw error;
+console.log(data);
+if (!data || data.length === 0) {
+  // Güncellenecek satır bulunamadı
+  return res.status(404).json({ error: `ICCID ${iccid} not found` });
+}
+
+res.json({ message: `ICCID ${iccid} status updated to ${status}` });
+  } catch (err) {
+  console.error("Error:", err);
+  res.status(500).json({ error: "Internal Server Error" });
+}
+};
+
+
 function formatICCID(input) {
   let cleanedInput = input.replace(/\s+/g, '');
   let iccids = cleanedInput.match(/.{1,20}/g);
@@ -193,7 +209,7 @@ function formatICCID(input) {
 const addIccid = async (req, res) => {
   const iccids = formatICCID(req.body);
   const iccidType = req.params.type;
-  
+
   if (!iccids || !iccidType) {
     return res.status(400).json({ error: "ICCID'ler ve ICCID tipi gereklidir" });
   }
@@ -252,10 +268,10 @@ const resetIccid = async (req, res) => {
 
 const addActivation = async (req, res) => {
   const { msisdn, tckn, birth_date, activationtype, user } = req.body;
-console.log(req.body);
+  console.log(req.body);
   if (!msisdn || !tckn || !birth_date || !activationtype) {
-    return res.status(400).json({ 
-      error: `${!msisdn ? 'msisdn' : !tckn ? 'tckn' : !birth_date ? 'birth_date' : 'activationType'} alanı doldurulmadı` 
+    return res.status(400).json({
+      error: `${!msisdn ? 'msisdn' : !tckn ? 'tckn' : !birth_date ? 'birth_date' : 'activationType'} alanı doldurulmadı`
     });
   }
 
@@ -282,7 +298,7 @@ console.log(req.body);
 
 const getActivations = async (req, res) => {
   const { user } = req.params;
-  
+
   try {
     const { data, error } = await supabase
       .from('activationstable')
@@ -329,11 +345,11 @@ const getStats = async (req, res) => {
     const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
       .select('activationType');
-    
+
     if (activationsError) throw activationsError;
 
     const totalActivations = activationsData.length;
-    
+
     // Group by activationType
     const activationTypes = activationsData.reduce((acc, curr) => {
       acc[curr.activationType] = (acc[curr.activationType] || 0) + 1;
@@ -344,11 +360,11 @@ const getStats = async (req, res) => {
     const { data: iccidData, error: iccidError } = await supabase
       .from('iccidTable')
       .select('stock');
-    
+
     if (iccidError) throw iccidError;
 
     const totalIccids = iccidData.length;
-    
+
     // Group by stock status
     const iccidStock = iccidData.reduce((acc, curr) => {
       acc[curr.stock] = (acc[curr.stock] || 0) + 1;
@@ -359,11 +375,11 @@ const getStats = async (req, res) => {
     const { data: mernisData, error: mernisError } = await supabase
       .from('mernisTable')
       .select('stock');
-    
+
     if (mernisError) throw mernisError;
 
     const totalMernis = mernisData.length;
-    
+
     // Group by stock status
     const mernisTypes = mernisData.reduce((acc, curr) => {
       acc[curr.stock] = (acc[curr.stock] || 0) + 1;
@@ -410,7 +426,7 @@ const reservedToAvailable = async (req, res) => {
 const formatIccid = async (req, res) => {
   try {
     const iccidText = req.body;
-    
+
     if (typeof iccidText !== 'string') {
       return res.status(400).json({ error: 'iccidText should be a string' });
     }
@@ -435,7 +451,7 @@ const formatIccid = async (req, res) => {
 const formatAndInsertIccids = async (req, res) => {
   try {
     const iccidText = req.body;
-    
+
     if (typeof iccidText !== 'string') {
       return res.status(400).json({ error: 'iccidText should be a string' });
     }
@@ -445,7 +461,7 @@ const formatAndInsertIccids = async (req, res) => {
       .filter(iccid => iccid !== '');
 
     const type = req.params.type || 'defaultType';
-    
+
     const iccidsToInsert = iccidArray.map(iccid => ({
       iccid: iccid,
       stock: 'available',
@@ -467,7 +483,7 @@ const formatAndInsertIccids = async (req, res) => {
 
 const bulkDelete = async (req, res) => {
   const { iccids } = req.body;
-  
+
   if (!Array.isArray(iccids) || iccids.length === 0) {
     return res.status(400).json({ error: 'Geçerli ICCID listesi gönderilmedi' });
   }
@@ -480,10 +496,10 @@ const bulkDelete = async (req, res) => {
       .select();
 
     if (error) throw error;
-    
-    res.json({ 
+
+    res.json({
       message: `${data.length} ICCID başarıyla silindi`,
-      deletedIccids: data 
+      deletedIccids: data
     });
   } catch (error) {
     console.error('ICCID silme hatası:', error);
@@ -507,5 +523,6 @@ module.exports = {
   reservedToAvailable,
   formatIccid,
   formatAndInsertIccids,
-  bulkDelete
+  bulkDelete,
+  setStatus
 };
