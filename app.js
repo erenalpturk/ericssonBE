@@ -11,6 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Import routes
 const iccidRoutes = require('./routes/iccidRoutes');
+const userRoutes = require('./routes/userRoutes');
 const mernisRoutes = require('./routes/mernisRoutes');
 
 // Middleware
@@ -22,6 +23,7 @@ app.use(express.text()); // For text body parsing
 // Routes
 app.use('/iccid', iccidRoutes);
 app.use('/mernis', mernisRoutes);
+app.use('/user', userRoutes);
 
 // Test Supabase connection
 const testConnection = async () => {

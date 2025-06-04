@@ -6,8 +6,8 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const getIccid = async (req, res) => {
-  console.log(req.params.type);
   const type = req.params.type;
+  const used_by = req.params.sicil_no;
   try {
     // Get parameters from gnl_parm table
     const { data: paramData, error: paramError } = await supabase
@@ -46,14 +46,13 @@ const getIccid = async (req, res) => {
     // Update stock to reserved
     const { error: updateError } = await supabase
       .from('iccidTable')
-      .update({ stock: 'reserved' })
+      .update({ stock: 'reserved', used_by: used_by })
       .eq('iccid', iccid)
       .eq('type', type);
 
     if (updateError) throw updateError;
 
     res.json(iccid);
-
     // Handle reservation timeout
     if (reservationEnabled) {
       setTimeout(async () => {
@@ -130,20 +129,19 @@ const getAll = async (req, res) => {
 };
 
 const setSold = async (req, res) => {
-  const { iccid } = req.body;
+  const { iccid, used_by } = req.body;
   if (!iccid) {
     return res.status(400).json({ error: "ICCID is required" });
   }
-
   try {
     const { error } = await supabase
       .from('iccidTable')
-      .update({ stock: 'sold' })
+      .update({ stock: 'sold', used_by: used_by })
       .eq('iccid', iccid);
 
     if (error) throw error;
 
-    res.json({ message: `ICCID ${iccid} has been sold` });
+    res.json({ message: `ICCID ${iccid} has been sold by ${used_by}` });
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -267,7 +265,7 @@ const resetIccid = async (req, res) => {
 };
 
 const addActivation = async (req, res) => {
-  const { msisdn, tckn, birth_date, activationtype, user } = req.body;
+  const { msisdn, tckn, birth_date, activationtype, user, iccid, prod_ofr_id } = req.body;
   console.log(req.body);
   if (!msisdn || !tckn || !birth_date || !activationtype) {
     return res.status(400).json({
@@ -284,7 +282,9 @@ const addActivation = async (req, res) => {
         birth_date,
         activationtype,
         user,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        iccid,
+        prod_ofr_id
       }]);
 
     if (error) throw error;
@@ -461,11 +461,12 @@ const formatAndInsertIccids = async (req, res) => {
       .filter(iccid => iccid !== '');
 
     const type = req.params.type || 'defaultType';
-
+    const sicil_no = req.params.sicil_no;
     const iccidsToInsert = iccidArray.map(iccid => ({
       iccid: iccid,
       stock: 'available',
-      type: type
+      type: type,
+      added_by: sicil_no
     }));
 
     const { error } = await supabase
