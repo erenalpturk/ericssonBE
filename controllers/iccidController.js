@@ -109,6 +109,31 @@ const getAllSpesific = async (req, res) => {
   }
 };
 
+const getIccidByUserId = async (req, res) => {
+  const { used_by } = req.params;
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('*')
+      .eq('used_by', used_by)
+      .order('updated_at', { ascending: false })
+
+    if (error) throw error;
+
+    if (data.length === 0) {
+      res.json({ message: `${used_by} kullanıcısı hiç iccid kullanmamış` });
+    } else {
+      res.json({
+        message: ` ${used_by} kullanıcısına ait ${data.length} adet ICCID bulundu`,
+        data: data
+      });
+    }
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 const getAll = async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -525,5 +550,6 @@ module.exports = {
   formatIccid,
   formatAndInsertIccids,
   bulkDelete,
-  setStatus
+  setStatus,
+  getIccidByUserId
 };

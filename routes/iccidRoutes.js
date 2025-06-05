@@ -16,6 +16,7 @@ router.post("/resetIccid", iccidController.resetIccid);
 
 // Data Retrieval Routes
 router.post("/getAll/:type/:stock", iccidController.getAllSpesific);
+router.post("/getAll/:used_by", iccidController.getIccidByUserId);
 router.post("/getAll", iccidController.getAll);
 router.get("/getStats", iccidController.getStats);
 
