@@ -10,20 +10,20 @@ const getIccid = async (req, res) => {
   const used_by = req.params.sicil_no;
   try {
     // Get parameters from gnl_parm table
-    const { data: paramData, error: paramError } = await supabase
-      .from('gnl_parm')
-      .select('param_name, param_value')
-      .in('param_name', ['reservation_timeout', 'reservation_enabled']);
+    // const { data: paramData, error: paramError } = await supabase
+    //   .from('gnl_parm')
+    //   .select('param_name, param_value')
+    //   .in('param_name', ['reservation_timeout', 'reservation_enabled']);
 
-    if (paramError) throw paramError;
+    // if (paramError) throw paramError;
 
-    const params = {};
-    paramData.forEach(row => {
-      params[row.param_name] = row.param_value;
-    });
+    // const params = {};
+    // paramData.forEach(row => {
+    //   params[row.param_name] = row.param_value;
+    // });
 
-    const reservationTimeout = parseInt(params['reservation_timeout'], 10);
-    const reservationEnabled = params['reservation_enabled'] === 'true';
+    // const reservationTimeout = parseInt(params['reservation_timeout'], 10);
+    // const reservationEnabled = params['reservation_enabled'] === 'true';
 
     // Get available ICCID
     const { data, error } = await supabase
