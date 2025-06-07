@@ -24,6 +24,8 @@ router.get("/getStats", iccidController.getStats);
 router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);
 router.post("/enesvealpdatalarinizigetiriyoru", iccidController.getActivationsPublic);
 router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
+router.post("/update-note", iccidController.updateActivationNote);
+router.post("/update-status", iccidController.updateActivationStatus);
 
 // ICCID Format and Import Routes
 router.post("/formatIccid", iccidController.formatIccid);
@@ -31,5 +33,6 @@ router.post("/formatAndInsertIccids/:type/:sicil_no", iccidController.formatAndI
 
 // Bulk Delete Route
 router.delete("/bulk-delete", iccidController.bulkDelete);
+
 
 module.exports = router;
