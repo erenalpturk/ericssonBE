@@ -309,7 +309,8 @@ const addActivation = async (req, res) => {
         user,
         created_at: new Date().toISOString(),
         iccid,
-        prod_ofr_id
+        prod_ofr_id,
+        status: 'clean'
       }]);
 
     if (error) throw error;
@@ -549,10 +550,6 @@ const updateActivationStatus = async (req, res) => {
 
   if (!activationId || !status) {
     return res.status(400).json({ error: "Aktivasyon ID ve status alanları zorunludur" });
-  }
-
-  if (!['clean', 'dirty'].includes(status)) {
-    return res.status(400).json({ error: "Status değeri 'clean' veya 'dirty' olmalıdır" });
   }
 
   try {
