@@ -544,6 +544,70 @@ const bulkDelete = async (req, res) => {
   }
 };
 
+const updateActivationStatus = async (req, res) => {
+  const { activationId, status } = req.body;
+
+  if (!activationId || !status) {
+    return res.status(400).json({ error: "Aktivasyon ID ve status alanları zorunludur" });
+  }
+
+  if (!['clean', 'dirty'].includes(status)) {
+    return res.status(400).json({ error: "Status değeri 'clean' veya 'dirty' olmalıdır" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('activationstable')
+      .update({ status: status })
+      .eq('activationid', activationId)
+      .select();
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: `Aktivasyon ID ${activationId} bulunamadı` });
+    }
+
+    res.json({ 
+      message: `Aktivasyon status'ü güncellendi`,
+      data: data[0]
+    });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const updateActivationNote = async (req, res) => {
+  const { activationId, note } = req.body;
+
+  if (!activationId) {
+    return res.status(400).json({ error: "Aktivasyon ID alanı zorunludur" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('activationstable')
+      .update({ note: note })
+      .eq('activationid', activationId)
+      .select();
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: `Aktivasyon ID ${activationId} bulunamadı` });
+    }
+
+    res.json({ 
+      message: `Aktivasyon notu güncellendi`,
+      data: data[0]
+    });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   getIccid,
   setSold,
@@ -562,5 +626,7 @@ module.exports = {
   formatAndInsertIccids,
   bulkDelete,
   setStatus,
-  getIccidByUserId
+  getIccidByUserId,
+  updateActivationStatus,
+  updateActivationNote
 };
