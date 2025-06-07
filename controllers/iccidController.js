@@ -323,26 +323,37 @@ const addActivation = async (req, res) => {
 
 const getActivations = async (req, res) => {
   const { user } = req.params;
-
   try {
     const { data, error } = await supabase
       .from('activationstable')
-      .select('*')
+      .select(`
+        *,
+        gnl_parm!inner(value)
+      `)
       .eq('user', user)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    if (data.length === 0) {
-      res.json({ message: "Datan kalmamış knk" });
-    } else {
-      res.json(data);
+    if (!data.length) {
+      return res.json({ message: "Data çıkmamışsın knk" });
     }
+
+    // gnl_parm nesnesinden value değerini çıkarıp ana nesneye ekle
+    const formattedData = data.map(item => ({
+      ...item,
+      tariff_name: item.gnl_parm?.value,
+      gnl_parm: undefined // gnl_parm nesnesini kaldır
+    }));
+
+    res.json(formattedData);
+
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
 const getActivationsPublic = async (req, res) => {
   try {
