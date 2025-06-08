@@ -11,7 +11,7 @@ const getIccid = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('iccidTable')
-      .select('iccid')
+      .select('iccid, iccidid')
       .eq('stock', 'available')
       .eq('type', type)
       .limit(1)
