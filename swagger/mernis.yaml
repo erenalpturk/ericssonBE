@@ -1,0 +1,145 @@
+paths:
+  /mernis/getMernis/{type}:
+    post:
+      summary: Belirli bir tipte Mernis verisi getirir
+      tags: [Mernis]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: Mernis veri tipi
+      responses:
+        '200':
+          description: Mernis verisi başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MernisData'
+
+  /mernis/getAll:
+    post:
+      summary: Tüm Mernis verilerini getirir
+      tags: [Mernis]
+      responses:
+        '200':
+          description: Tüm Mernis verileri başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MernisData'
+
+  /mernis/getAll/{type}/{stock}:
+    post:
+      summary: Belirli tipte ve stok durumuna göre Mernis verilerini getirir
+      tags: [Mernis]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: Mernis veri tipi
+        - in: path
+          name: stock
+          schema:
+            type: string
+          required: true
+          description: Stok durumu
+      responses:
+        '200':
+          description: Mernis verileri başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MernisData'
+
+  /mernis/addMernis:
+    post:
+      summary: Yeni Mernis verisi ekler
+      tags: [Mernis]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tcno:
+                  type: string
+                type:
+                  type: string
+                status:
+                  type: string
+                sicil_no:
+                  type: string
+      responses:
+        '200':
+          description: Mernis verisi başarıyla eklendi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MernisData'
+
+  /mernis/mernisData/{type}:
+    post:
+      summary: Belirli tipte Mernis verisi işlemleri yapar
+      tags: [Mernis]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: Mernis veri tipi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+      responses:
+        '200':
+          description: Mernis verisi başarıyla işlendi
+
+  /mernis/deleteSold:
+    post:
+      summary: Satılmış Mernis verilerini siler
+      tags: [Mernis]
+      responses:
+        '200':
+          description: Satılmış Mernis verileri başarıyla silindi
+
+  /mernis/resetMernis:
+    post:
+      summary: Tüm Mernis verilerini sıfırlar
+      tags: [Mernis]
+      responses:
+        '200':
+          description: Mernis verileri başarıyla sıfırlandı
+
+components:
+  schemas:
+    MernisData:
+      type: object
+      properties:
+        tcno:
+          type: string
+          description: TC Kimlik Numarası
+        type:
+          type: string
+          description: Mernis veri tipi
+        status:
+          type: string
+          description: Durum bilgisi
+        sicil_no:
+          type: string
+          description: Sicil numarası 

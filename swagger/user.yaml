@@ -1,0 +1,66 @@
+paths:
+  /user/updatePassword:
+    post:
+      summary: Kullanıcı şifresini günceller
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+      responses:
+        '200':
+          description: Şifre başarıyla güncellendi
+        '400':
+          description: Geçersiz istek
+        '401':
+          description: Yetkisiz erişim
+
+  /user/getUser:
+    post:
+      summary: Kullanıcı bilgilerini getirir
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+      responses:
+        '200':
+          description: Kullanıcı bilgileri başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Kullanıcı bulunamadı
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Kullanıcı ID'si
+        username:
+          type: string
+          description: Kullanıcı adı
+        email:
+          type: string
+          description: E-posta adresi
+        role:
+          type: string
+          description: Kullanıcı rolü 

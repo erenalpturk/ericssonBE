@@ -1,0 +1,351 @@
+paths:
+  /iccid/getIccid/{type}/{sicil_no}:
+    post:
+      summary: Belirli bir tipte ICCID'yi sicil numarası adına alır
+      tags: [ICCID]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: ICCID tipi
+        - in: path
+          name: sicil_no
+          schema:
+            type: string
+          required: true
+          description: Sicil numarası
+      responses:
+        '200':
+          description: ICCID başarıyla alındı
+        '400':
+          description: Geçersiz istek
+
+  /iccid/setSold:
+    post:
+      summary: ICCID'i satıldı olarak işaretler
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccid:
+                  type: string
+      responses:
+        '200':
+          description: ICCID başarıyla satıldı olarak işaretlendi
+
+  /iccid/setAvailable:
+    post:
+      summary: ICCID'i kullanılabilir olarak işaretler
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccid:
+                  type: string
+      responses:
+        '200':
+          description: ICCID başarıyla kullanılabilir olarak işaretlendi
+
+  /iccid/reservedToAvailable:
+    post:
+      summary: Rezerve edilmiş ICCID'i kullanılabilir yapar
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccid:
+                  type: string
+      responses:
+        '200':
+          description: ICCID başarıyla kullanılabilir yapıldı
+
+  /iccid/setStatus:
+    post:
+      summary: ICCID durumunu günceller
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccid:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: ICCID durumu başarıyla güncellendi
+
+  /iccid/addIccid/{type}:
+    post:
+      summary: Belirli bir tipte ICCID ekler
+      tags: [ICCID]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: ICCID tipi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: ICCID'ler başarıyla eklendi
+
+  /iccid/deleteAll:
+    post:
+      summary: Tüm ICCID'leri siler
+      tags: [ICCID]
+      responses:
+        '200':
+          description: Tüm ICCID'ler başarıyla silindi
+
+  /iccid/resetIccid:
+    post:
+      summary: ICCID'leri sıfırlar
+      tags: [ICCID]
+      responses:
+        '200':
+          description: ICCID'ler başarıyla sıfırlandı
+
+  /iccid/getAll/{type}/{stock}:
+    post:
+      summary: Belirli tipte ve stok durumuna göre ICCID'leri getirir
+      tags: [ICCID]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: ICCID tipi
+        - in: path
+          name: stock
+          schema:
+            type: string
+          required: true
+          description: Stok durumu
+      responses:
+        '200':
+          description: ICCID'ler başarıyla getirildi
+
+  /iccid/getAll/{used_by}:
+    post:
+      summary: Kullanıcıya göre ICCID'leri getirir
+      tags: [ICCID]
+      parameters:
+        - in: path
+          name: used_by
+          schema:
+            type: string
+          required: true
+          description: Kullanıcı ID'si
+      responses:
+        '200':
+          description: ICCID'ler başarıyla getirildi
+
+  /iccid/getAll:
+    post:
+      summary: Tüm ICCID'leri getirir
+      tags: [ICCID]
+      responses:
+        '200':
+          description: Tüm ICCID'ler başarıyla getirildi
+
+  /iccid/getStats:
+    get:
+      summary: ICCID istatistiklerini getirir
+      tags: [ICCID]
+      responses:
+        '200':
+          description: İstatistikler başarıyla getirildi
+
+  /iccid/enesVeAlpDataniziCikti:
+    post:
+      summary: Aktivasyon ekler
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activation:
+                  type: object
+      responses:
+        '200':
+          description: Aktivasyon başarıyla eklendi
+
+  /iccid/enesvealpdatalarinizigetiriyoru:
+    post:
+      summary: Tüm aktivasyonları getirir
+      tags: [ICCID]
+      responses:
+        '200':
+          description: Aktivasyonlar başarıyla getirildi
+
+  /iccid/enesvealpdatalarinizigetiriyor/{user}:
+    post:
+      summary: Belirli bir kullanıcının aktivasyonlarını getirir
+      tags: [ICCID]
+      parameters:
+        - in: path
+          name: user
+          schema:
+            type: string
+          required: true
+          description: Kullanıcı ID'si
+      responses:
+        '200':
+          description: Kullanıcının aktivasyonları başarıyla getirildi
+
+  /iccid/update-note:
+    post:
+      summary: Aktivasyon notunu günceller
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activationId:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Not başarıyla güncellendi
+
+  /iccid/update-status:
+    post:
+      summary: Aktivasyon durumunu günceller
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activationId:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Durum başarıyla güncellendi
+
+  /iccid/formatIccid:
+    post:
+      summary: ICCID formatını düzenler
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccid:
+                  type: string
+      responses:
+        '200':
+          description: ICCID başarıyla formatlandı
+
+  /iccid/formatAndInsertIccids/{type}/{sicil_no}:
+    post:
+      summary: ICCID'leri formatlar ve ekler
+      tags: [ICCID]
+      parameters:
+        - in: path
+          name: type
+          schema:
+            type: string
+          required: true
+          description: ICCID tipi
+        - in: path
+          name: sicil_no
+          schema:
+            type: string
+          required: true
+          description: Sicil numarası
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: ICCID'ler başarıyla formatlandı ve eklendi
+
+  /iccid/bulk-delete:
+    delete:
+      summary: Toplu ICCID silme işlemi
+      tags: [ICCID]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                iccids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: ICCID'ler başarıyla silindi
+
+components:
+  schemas:
+    ICCID:
+      type: object
+      properties:
+        iccid:
+          type: string
+          description: ICCID numarası
+        type:
+          type: string
+          description: ICCID tipi
+        status:
+          type: string
+          description: ICCID durumu
+        sicil_no:
+          type: string
+          description: Sicil numarası 

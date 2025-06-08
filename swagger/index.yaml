@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Ericsson Backend API
+  version: 1.0.0
+  description: Ericsson Backend API Dokümantasyonu
+
+servers:
+  - url: http://localhost:5432
+    description: Development server
+
+tags:
+  - name: ICCID
+    description: ICCID yönetimi ile ilgili endpoint'ler
+  - name: Mernis
+    description: Mernis veri yönetimi ile ilgili endpoint'ler
+  - name: Users
+    description: Kullanıcı yönetimi ile ilgili endpoint'ler
+
+paths:
+  $ref: './iccid.yaml#/paths'
+  $ref: './mernis.yaml#/paths'
+  $ref: './user.yaml#/paths'
+
+components:
+  schemas:
+    $ref: './iccid.yaml#/components/schemas'
+    $ref: './mernis.yaml#/components/schemas'
+    $ref: './user.yaml#/components/schemas' 

@@ -6,16 +6,14 @@ const iccidController = require("../controllers/iccidController.js");
 router.post("/getIccid/:type/:sicil_no", iccidController.getIccid);
 router.post("/setSold", iccidController.setSold);
 router.post("/setAvailable", iccidController.setAvailable);
-router.post("/reservedToAvailable", iccidController.reservedToAvailable);
-router.post("/setStatus", iccidController.setStatus);
+router.post("/update-iccid", iccidController.updateIccid);
 
 // Bulk Operations
-router.post("/addIccid/:type", iccidController.addIccid);
 router.post("/deleteAll", iccidController.deleteAll);
 router.post("/resetIccid", iccidController.resetIccid);
+router.delete("/bulk-delete", iccidController.bulkDelete);
 
 // Data Retrieval Routes
-router.post("/getAll/:type/:stock", iccidController.getAllSpesific);
 router.post("/getAll/:used_by", iccidController.getIccidByUserId);
 router.post("/getAll", iccidController.getAll);
 router.get("/getStats", iccidController.getStats);
@@ -24,15 +22,9 @@ router.get("/getStats", iccidController.getStats);
 router.post("/enesVeAlpDataniziCikti", iccidController.addActivation);
 router.post("/enesvealpdatalarinizigetiriyoru", iccidController.getActivationsPublic);
 router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
-router.post("/update-note", iccidController.updateActivationNote);
-router.post("/update-status", iccidController.updateActivationStatus);
+router.post("/update-activation", iccidController.updateActivation);
 
 // ICCID Format and Import Routes
-router.post("/formatIccid", iccidController.formatIccid);
 router.post("/formatAndInsertIccids/:type/:sicil_no", iccidController.formatAndInsertIccids);
-
-// Bulk Delete Route
-router.delete("/bulk-delete", iccidController.bulkDelete);
-
 
 module.exports = router;

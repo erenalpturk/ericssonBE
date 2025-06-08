@@ -2,6 +2,9 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const path = require('path');
 require('dotenv').config();
 
 // Initialize Supabase client
@@ -24,6 +27,36 @@ app.use(express.text()); // For text body parsing
 app.use('/iccid', iccidRoutes);
 app.use('/mernis', mernisRoutes);
 app.use('/user', userRoutes);
+
+// Swagger yapılandırması
+const swaggerDocument = YAML.load(path.join(__dirname, 'swagger/index.yaml'));
+const iccidSpec = YAML.load(path.join(__dirname, 'swagger/iccid.yaml'));
+const mernisSpec = YAML.load(path.join(__dirname, 'swagger/mernis.yaml'));
+const userSpec = YAML.load(path.join(__dirname, 'swagger/user.yaml'));
+
+// Tüm spesifikasyonları birleştir
+swaggerDocument.paths = {
+  ...swaggerDocument.paths,
+  ...iccidSpec.paths,
+  ...mernisSpec.paths,
+  ...userSpec.paths
+};
+
+swaggerDocument.components = {
+  ...swaggerDocument.components,
+  schemas: {
+    ...swaggerDocument.components?.schemas,
+    ...iccidSpec.components?.schemas,
+    ...mernisSpec.components?.schemas,
+    ...userSpec.components?.schemas
+  }
+};
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "Ericsson Backend API Documentation"
+}));
 
 // Test Supabase connection
 const testConnection = async () => {
