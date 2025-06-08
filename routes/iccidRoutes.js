@@ -4,8 +4,6 @@ const iccidController = require("../controllers/iccidController.js");
 
 // ICCID Management Routes
 router.post("/getIccid/:type/:sicil_no", iccidController.getIccid);
-router.post("/setSold", iccidController.setSold);
-router.post("/setAvailable", iccidController.setAvailable);
 router.post("/update-iccid", iccidController.updateIccid);
 
 // Bulk Operations

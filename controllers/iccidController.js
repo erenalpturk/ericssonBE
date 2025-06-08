@@ -135,49 +135,6 @@ const getAll = async (req, res) => {
   }
 };
 
-//silinecek
-const setSold = async (req, res) => {
-  const { iccid, used_by } = req.body;
-  if (!iccid) {
-    return res.status(400).json({ error: "ICCID is required" });
-  }
-  try {
-    const { error } = await supabase
-      .from('iccidTable')
-      .update({ stock: 'sold', used_by: used_by })
-      .eq('iccid', iccid);
-
-    if (error) throw error;
-
-    res.json({ message: `ICCID ${iccid} has been sold by ${used_by}` });
-  } catch (err) {
-    console.error("Error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-const setAvailable = async (req, res) => {
-  const { iccid } = req.body;
-  if (!iccid) {
-    return res.status(400).json({ error: "ICCID is required" });
-  }
-
-  try {
-    const { error } = await supabase
-      .from('iccidTable')
-      .update({ stock: 'available' })
-      .eq('iccid', iccid);
-
-    if (error) throw error;
-
-    res.json({ message: `ICCID ${iccid} is now available` });
-  } catch (err) {
-    console.error("Error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-//silinecek
-
 const updateIccid = async (req, res) => {
   const { iccidid, used_by, status } = req.body;
 
@@ -502,8 +459,6 @@ const getStats = async (req, res) => {
 
 module.exports = {
   getIccid,
-  setSold,
-  setAvailable,
   deleteAll,
   addActivation,
   getActivations,
