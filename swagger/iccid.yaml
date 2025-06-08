@@ -1,31 +1,65 @@
 paths:
   /iccid/getIccid/{type}/{sicil_no}:
     post:
-      summary: Belirli bir tipte ICCID'yi sicil numarası adına alır
-      tags: [ICCID]
+      tags:
+        - ICCID
+      summary: Retrieve and reserve an available ICCID of the specified type for a user
       parameters:
-        - in: path
-          name: type
+        - name: type
+          in: path
+          description: ICCID type to retrieve
+          required: true
           schema:
             type: string
+        - name: sicil_no
+          in: path
+          description: User identifier reserving the ICCID
           required: true
-          description: ICCID tipi
-        - in: path
-          name: sicil_no
           schema:
             type: string
-          required: true
-          description: Sicil numarası
       responses:
         '200':
-          description: ICCID başarıyla alındı
-        '400':
-          description: Geçersiz istek
+          description: Successfully retrieved and reserved an ICCID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  iccidid:
+                    type: string
+                  iccid:
+                    type: string
+                required:
+                  - iccidid
+                  - iccid
+        '404':
+          description: No available ICCID of the given type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
 
-  /iccid/setSold:
+  /iccid/update-iccid:
     post:
-      summary: ICCID'i satıldı olarak işaretler
-      tags: [ICCID]
+      tags:
+        - ICCID
+      summary: Update the status (stock) of an ICCID
       requestBody:
         required: true
         content:
@@ -33,290 +67,124 @@ paths:
             schema:
               type: object
               properties:
-                iccid:
+                iccidid:
                   type: string
-      responses:
-        '200':
-          description: ICCID başarıyla satıldı olarak işaretlendi
-
-  /iccid/setAvailable:
-    post:
-      summary: ICCID'i kullanılabilir olarak işaretler
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                iccid:
-                  type: string
-      responses:
-        '200':
-          description: ICCID başarıyla kullanılabilir olarak işaretlendi
-
-  /iccid/reservedToAvailable:
-    post:
-      summary: Rezerve edilmiş ICCID'i kullanılabilir yapar
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                iccid:
-                  type: string
-      responses:
-        '200':
-          description: ICCID başarıyla kullanılabilir yapıldı
-
-  /iccid/setStatus:
-    post:
-      summary: ICCID durumunu günceller
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                iccid:
-                  type: string
+                  description: Unique identifier of the ICCID record
                 status:
                   type: string
+                  description: New status for the ICCID
+                  enum:
+                    - sold
+                    - available
+                    - reserved
+                used_by:
+                  type: string
+                  description: Identifier of the user using the ICCID (required if status is "sold")
+              required:
+                - iccidid
+                - status
       responses:
         '200':
-          description: ICCID durumu başarıyla güncellendi
-
-  /iccid/addIccid/{type}:
-    post:
-      summary: Belirli bir tipte ICCID ekler
-      tags: [ICCID]
-      parameters:
-        - in: path
-          name: type
-          schema:
-            type: string
-          required: true
-          description: ICCID tipi
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                iccids:
-                  type: array
-                  items:
+          description: ICCID status successfully updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
                     type: string
-      responses:
-        '200':
-          description: ICCID'ler başarıyla eklendi
+                    example: ICCID abc123 status updated to reserved
+        '400':
+          description: Bad request due to missing or invalid parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: ICCID and status are required
+        '404':
+          description: ICCID not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: ICCID abc123 not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
 
   /iccid/deleteAll:
     post:
-      summary: Tüm ICCID'leri siler
-      tags: [ICCID]
+      tags:
+        - ICCID
+      summary: Delete all ICCIDs with stock 'sold' or 'reserved'
       responses:
         '200':
-          description: Tüm ICCID'ler başarıyla silindi
+          description: Successfully deleted reserved and sold ICCIDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Reserved ve sold ICCID'ler silindi
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
 
   /iccid/resetIccid:
     post:
-      summary: ICCID'leri sıfırlar
-      tags: [ICCID]
+      tags:
+        - ICCID
+      summary: Delete all ICCID records
+      description: Removes every ICCID entry from the database.
       responses:
         '200':
-          description: ICCID'ler başarıyla sıfırlandı
-
-  /iccid/getAll/{type}/{stock}:
-    post:
-      summary: Belirli tipte ve stok durumuna göre ICCID'leri getirir
-      tags: [ICCID]
-      parameters:
-        - in: path
-          name: type
-          schema:
-            type: string
-          required: true
-          description: ICCID tipi
-        - in: path
-          name: stock
-          schema:
-            type: string
-          required: true
-          description: Stok durumu
-      responses:
-        '200':
-          description: ICCID'ler başarıyla getirildi
-
-  /iccid/getAll/{used_by}:
-    post:
-      summary: Kullanıcıya göre ICCID'leri getirir
-      tags: [ICCID]
-      parameters:
-        - in: path
-          name: used_by
-          schema:
-            type: string
-          required: true
-          description: Kullanıcı ID'si
-      responses:
-        '200':
-          description: ICCID'ler başarıyla getirildi
-
-  /iccid/getAll:
-    post:
-      summary: Tüm ICCID'leri getirir
-      tags: [ICCID]
-      responses:
-        '200':
-          description: Tüm ICCID'ler başarıyla getirildi
-
-  /iccid/getStats:
-    get:
-      summary: ICCID istatistiklerini getirir
-      tags: [ICCID]
-      responses:
-        '200':
-          description: İstatistikler başarıyla getirildi
-
-  /iccid/enesVeAlpDataniziCikti:
-    post:
-      summary: Aktivasyon ekler
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                activation:
-                  type: object
-      responses:
-        '200':
-          description: Aktivasyon başarıyla eklendi
-
-  /iccid/enesvealpdatalarinizigetiriyoru:
-    post:
-      summary: Tüm aktivasyonları getirir
-      tags: [ICCID]
-      responses:
-        '200':
-          description: Aktivasyonlar başarıyla getirildi
-
-  /iccid/enesvealpdatalarinizigetiriyor/{user}:
-    post:
-      summary: Belirli bir kullanıcının aktivasyonlarını getirir
-      tags: [ICCID]
-      parameters:
-        - in: path
-          name: user
-          schema:
-            type: string
-          required: true
-          description: Kullanıcı ID'si
-      responses:
-        '200':
-          description: Kullanıcının aktivasyonları başarıyla getirildi
-
-  /iccid/update-note:
-    post:
-      summary: Aktivasyon notunu günceller
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                activationId:
-                  type: string
-                note:
-                  type: string
-      responses:
-        '200':
-          description: Not başarıyla güncellendi
-
-  /iccid/update-status:
-    post:
-      summary: Aktivasyon durumunu günceller
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                activationId:
-                  type: string
-                status:
-                  type: string
-      responses:
-        '200':
-          description: Durum başarıyla güncellendi
-
-  /iccid/formatIccid:
-    post:
-      summary: ICCID formatını düzenler
-      tags: [ICCID]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                iccid:
-                  type: string
-      responses:
-        '200':
-          description: ICCID başarıyla formatlandı
-
-  /iccid/formatAndInsertIccids/{type}/{sicil_no}:
-    post:
-      summary: ICCID'leri formatlar ve ekler
-      tags: [ICCID]
-      parameters:
-        - in: path
-          name: type
-          schema:
-            type: string
-          required: true
-          description: ICCID tipi
-        - in: path
-          name: sicil_no
-          schema:
-            type: string
-          required: true
-          description: Sicil numarası
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                iccids:
-                  type: array
-                  items:
+          description: All ICCIDs successfully deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
                     type: string
-      responses:
-        '200':
-          description: ICCID'ler başarıyla formatlandı ve eklendi
+                    example: Tüm ICCID'ler silindi
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
 
   /iccid/bulk-delete:
     delete:
-      summary: Toplu ICCID silme işlemi
-      tags: [ICCID]
+      tags:
+        - ICCID
+      summary: Bulk delete specific ICCIDs
       requestBody:
         required: true
         content:
@@ -326,26 +194,876 @@ paths:
               properties:
                 iccids:
                   type: array
+                  description: List of ICCID strings to delete
                   items:
                     type: string
+              required:
+                - iccids
       responses:
         '200':
-          description: ICCID'ler başarıyla silindi
+          description: ICCIDs deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 3 ICCID başarıyla silindi
+                  deletedIccids:
+                    type: array
+                    description: Details of deleted ICCID records
+                    items:
+                      type: object
+                      properties:
+                        iccid:
+                          type: string
+                        iccidid:
+                          type: string
+        '400':
+          description: Bad request due to missing or invalid ICCID list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Geçerli ICCID listesi gönderilmedi
+        '500':
+          description: ICCID silinirken bir hata oluştu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: ICCID silinirken bir hata oluştu
+
+  /iccid/getAll/{used_by}:
+    post:
+      tags:
+        - ICCID
+      summary: Get all ICCIDs reserved or used by a specific user
+      parameters:
+        - name: used_by
+          in: path
+          description: Identifier of the user whose ICCIDs to retrieve
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ICCID records retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "user123 kullanıcısına ait 5 adet ICCID bulundu"
+                  data:
+                    type: array
+                    description: List of ICCID records for the user (omitted if none found)
+                    items:
+                      type: object
+                      properties:
+                        iccidid:
+                          type: string
+                          description: Unique ICCID record identifier
+                          example: "abc123"
+                        iccid:
+                          type: string
+                          description: The ICCID value
+                          example: "8914800000123456789"
+                        type:
+                          type: string
+                          description: ICCID type
+                          example: "SIM"
+                        stock:
+                          type: string
+                          description: Current stock status
+                          example: "reserved"
+                        used_by:
+                          type: string
+                          description: User identifier who reserved or used the ICCID
+                          example: "user123"
+                        updated_at:
+                          type: string
+                          format: date-time
+                          description: Timestamp of last update
+                          example: "2025-06-08T15:30:00Z"
+                required:
+                  - message
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+
+  /iccid/getAll:
+    post:
+      tags:
+        - ICCID
+      summary: Retrieve all ICCID records
+      responses:
+        '200':
+          description: List of all ICCIDs or message if none available
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: ICCID kalmamış knk
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        iccidid:
+                          type: string
+                          description: Unique identifier of the ICCID record
+                          example: abc123
+                        iccid:
+                          type: string
+                          description: The ICCID value
+                          example: 8914800000123456789
+                        type:
+                          type: string
+                          description: ICCID category/type
+                          example: SIM
+                        stock:
+                          type: string
+                          description: Current stock status
+                          example: available
+                        used_by:
+                          type: string
+                          description: Identifier of the user who reserved or used the ICCID
+                          example: user123
+                        updated_at:
+                          type: string
+                          format: date-time
+                          description: Timestamp of the last update
+                          example: 2025-06-08T16:00:00Z
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
+
+  /iccid/getStats:
+    get:
+      tags:
+        - ICCID
+      summary: Get statistics for activations, ICCIDs, and Mernis records
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activations:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: Total number of activation records
+                        example: 120
+                      types:
+                        type: object
+                        description: Counts grouped by activationType
+                        additionalProperties:
+                          type: integer
+                        example:
+                          ACTIVATE: 80
+                          DEACTIVATE: 40
+                  iccids:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: Total number of ICCID records
+                        example: 300
+                      stock:
+                        type: object
+                        description: Counts grouped by stock status
+                        additionalProperties:
+                          type: integer
+                        example:
+                          available: 150
+                          reserved: 100
+                          sold: 50
+                  mernis:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: Total number of Mernis records
+                        example: 75
+                      types:
+                        type: object
+                        description: Counts grouped by Mernis stock status
+                        additionalProperties:
+                          type: integer
+                        example:
+                          valid: 60
+                          expired: 15
+                required:
+                  - activations
+                  - iccids
+                  - mernis
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
+
+  /iccid/enesVeAlpDataniziCikti:
+    post:
+      tags:
+        - Data
+      summary: Add a new activation record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                msisdn:
+                  type: string
+                  description: Mobile number for activation
+                  example: "905321234567"
+                tckn:
+                  type: string
+                  description: Turkish national ID number
+                  example: "12345678901"
+                birth_date:
+                  type: string
+                  format: date
+                  description: User's birth date
+                  example: "1990-05-21"
+                activationtype:
+                  type: string
+                  description: Type of activation
+                  example: "ACTIVATE"
+                user:
+                  type: string
+                  description: Identifier of the user performing the activation
+                  example: "user123"
+                iccid:
+                  type: string
+                  description: ICCID associated with the activation
+                  example: "8914800000123456789"
+                prod_ofr_id:
+                  type: string
+                  description: Product offer ID linked to the activation
+                  example: "PROD123"
+              required:
+                - msisdn
+                - tckn
+                - birth_date
+                - activationtype
+      responses:
+        '200':
+          description: Activation record added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Data Db'ye başarıyla eklendi"
+        '400':
+          description: Missing required field
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "msisdn alanı doldurulmadı"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+
+  /iccid/enesvealpdatalarinizigetiriyoru:
+    post:
+      tags:
+        - Data
+      summary: Get public activations excluding internal users
+      responses:
+        '200':
+          description: Public activation records or a message if none exist
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Datan kalmamış knk
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        msisdn:
+                          type: string
+                          description: Mobile number for activation
+                          example: "905321234567"
+                        tckn:
+                          type: string
+                          description: Turkish national ID number
+                          example: "12345678901"
+                        birth_date:
+                          type: string
+                          format: date
+                          description: User's birth date
+                          example: "1990-05-21"
+                        activationtype:
+                          type: string
+                          description: Type of activation
+                          example: "ACTIVATE"
+                        user:
+                          type: string
+                          description: User who performed the activation
+                          example: "user123"
+                        created_at:
+                          type: string
+                          format: date-time
+                          description: Record creation timestamp
+                          example: "2025-06-08T12:34:56Z"
+                        iccid:
+                          type: string
+                          description: ICCID associated with the activation
+                          example: "8914800000123456789"
+                        prod_ofr_id:
+                          type: string
+                          description: Product offer ID
+                          example: "PROD123"
+                        status:
+                          type: string
+                          description: Current activation status
+                          example: "clean"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
+
+  /iccid/enesvealpdatalarinizigetiriyor/{user}:
+    post:
+      tags:
+        - Data
+      summary: Get activations for a specific user with tariff name
+      parameters:
+        - name: user
+          in: path
+          description: Identifier of the user whose activations to retrieve
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Activation records with tariff_name or a message if none found
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Data çıkmamışsın knk"
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        msisdn:
+                          type: string
+                          example: "905321234567"
+                        tckn:
+                          type: string
+                          example: "12345678901"
+                        birth_date:
+                          type: string
+                          format: date
+                          example: "1990-05-21"
+                        activationtype:
+                          type: string
+                          example: "ACTIVATE"
+                        user:
+                          type: string
+                          example: "user123"
+                        created_at:
+                          type: string
+                          format: date-time
+                          example: "2025-06-08T12:34:56Z"
+                        iccid:
+                          type: string
+                          example: "8914800000123456789"
+                        prod_ofr_id:
+                          type: string
+                          example: "PROD123"
+                        status:
+                          type: string
+                          example: "clean"
+                        tariff_name:
+                          type: string
+                          description: Extracted from gnl_parm.value
+                          example: "STANDARD_TARIFF"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+
+  /iccid/update-activation:
+    post:
+      tags:
+        - Data
+      summary: Update an existing activation record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activationId:
+                  type: string
+                  description: Unique identifier of the activation record
+                  example: "act_12345"
+                status:
+                  type: string
+                  description: New status for the activation
+                  example: "processed"
+                note:
+                  type: string
+                  description: Optional note or comment for the activation
+                  example: "Customer requested expedited processing"
+              required:
+                - activationId
+      responses:
+        '200':
+          description: Activation record updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Aktivasyon güncellendi"
+                  data:
+                    type: object
+                    description: The updated activation record
+                    properties:
+                      activationid:
+                        type: string
+                        example: "act_12345"
+                      msisdn:
+                        type: string
+                        example: "905321234567"
+                      tckn:
+                        type: string
+                        example: "12345678901"
+                      birth_date:
+                        type: string
+                        format: date
+                        example: "1990-05-21"
+                      activationtype:
+                        type: string
+                        example: "ACTIVATE"
+                      user:
+                        type: string
+                        example: "user123"
+                      iccid:
+                        type: string
+                        example: "8914800000123456789"
+                      prod_ofr_id:
+                        type: string
+                        example: "PROD123"
+                      status:
+                        type: string
+                        example: "processed"
+                      note:
+                        type: string
+                        example: "Customer requested expedited processing"
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: "2025-06-08T09:15:00Z"
+                      updated_at:
+                        type: string
+                        format: date-time
+                        example: "2025-06-08T10:20:00Z"
+        '400':
+          description: Bad request due to missing activationId or fields to update
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Aktivasyon ID ile birlikte en az bir güncellenecek alan (status veya note) gönderilmelidir"
+        '404':
+          description: Activation record not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Aktivasyon ID act_12345 bulunamadı"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+
+  /iccid/formatAndInsertIccids/{type}/{sicil_no}:
+    post:
+      tags:
+        - ICCID
+      summary: Format newline-separated ICCIDs from raw text and bulk insert into the database
+      parameters:
+        - name: type
+          in: path
+          description: ICCID type to assign to each record
+          required: true
+          schema:
+            type: string
+        - name: sicil_no
+          in: path
+          description: Identifier of the user adding the ICCIDs
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              description: Newline-separated ICCID values as raw text
+              example: |
+                8914800000123456789
+                8914800000123456790
+                8914800000123456791
+      responses:
+        '200':
+          description: ICCIDs formatted and inserted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "ICCID'ler başarıyla eklendi"
+        '400':
+          description: Bad request when request body is not a raw string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "iccidText should be a string"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+                    
 
 components:
   schemas:
-    ICCID:
+    MessageResponse:
       type: object
       properties:
+        message:
+          type: string
+      required:
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    IccidBasic:
+      type: object
+      properties:
+        iccidid:
+          type: string
         iccid:
           type: string
-          description: ICCID numarası
+      required:
+        - iccidid
+        - iccid
+
+    IccidFull:
+      type: object
+      properties:
+        iccidid:
+          type: string
+        iccid:
+          type: string
         type:
           type: string
-          description: ICCID tipi
+        stock:
+          type: string
+        used_by:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - iccidid
+        - iccid
+        - type
+        - stock
+
+    UpdateIccidRequest:
+      type: object
+      properties:
+        iccidid:
+          type: string
         status:
           type: string
-          description: ICCID durumu
-        sicil_no:
+          enum:
+            - sold
+            - available
+            - reserved
+        used_by:
           type: string
-          description: Sicil numarası 
+      required:
+        - iccidid
+        - status
+
+    BulkDeleteRequest:
+      type: object
+      properties:
+        iccids:
+          type: array
+          items:
+            type: string
+      required:
+        - iccids
+
+    BulkDeleteResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        deletedIccids:
+          type: array
+          items:
+            $ref: '#/components/schemas/IccidBasic'
+      required:
+        - message
+        - deletedIccids
+
+    GetStatsResponse:
+      type: object
+      properties:
+        activations:
+          type: object
+          properties:
+            total:
+              type: integer
+            types:
+              type: object
+              additionalProperties:
+                type: integer
+          required:
+            - total
+            - types
+        iccids:
+          type: object
+          properties:
+            total:
+              type: integer
+            stock:
+              type: object
+              additionalProperties:
+                type: integer
+          required:
+            - total
+            - stock
+        mernis:
+          type: object
+          properties:
+            total:
+              type: integer
+            types:
+              type: object
+              additionalProperties:
+                type: integer
+          required:
+            - total
+            - types
+      required:
+        - activations
+        - iccids
+        - mernis
+
+    Activation:
+      type: object
+      properties:
+        activationid:
+          type: string
+        msisdn:
+          type: string
+        tckn:
+          type: string
+        birth_date:
+          type: string
+          format: date
+        activationtype:
+          type: string
+        user:
+          type: string
+        iccid:
+          type: string
+        prod_ofr_id:
+          type: string
+        status:
+          type: string
+        note:
+          type: string
+        tariff_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - activationid
+        - msisdn
+        - tckn
+        - birth_date
+        - activationtype
+        - user
+        - status
+        - created_at
+
+    AddActivationRequest:
+      type: object
+      properties:
+        msisdn:
+          type: string
+        tckn:
+          type: string
+        birth_date:
+          type: string
+          format: date
+        activationtype:
+          type: string
+        user:
+          type: string
+        iccid:
+          type: string
+        prod_ofr_id:
+          type: string
+      required:
+        - msisdn
+        - tckn
+        - birth_date
+        - activationtype
+
+    UpdateActivationRequest:
+      type: object
+      properties:
+        activationId:
+          type: string
+        status:
+          type: string
+        note:
+          type: string
+      required:
+        - activationId
+
+    UpdateActivationResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Activation'
+      required:
+        - message
+        - data
+
+    RawIccidText:
+      type: string
+      description: Newline-separated ICCID values as raw text
+
+    FormatInsertResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message

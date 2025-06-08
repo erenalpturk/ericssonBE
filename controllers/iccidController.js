@@ -43,31 +43,6 @@ const getIccid = async (req, res) => {
   }
 };
 
-// const getAllSpesific = async (req, res) => {
-//   const { type, stock } = req.params;
-//   try {
-//     const { data, error } = await supabase
-//       .from('iccidTable')
-//       .select('*')
-//       .eq('type', type)
-//       .eq('stock', stock);
-
-//     if (error) throw error;
-
-//     if (data.length === 0) {
-//       res.json({ message: `${type} türünde ${stock} ICCID kalmamış knk` });
-//     } else {
-//       res.json({
-//         message: `${data.length} adet ${type} türünde ${stock} ICCID bulundu`,
-//         data: data
-//       });
-//     }
-//   } catch (err) {
-//     console.error("Error:", err);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// };
-
 const getIccidByUserId = async (req, res) => {
   const { used_by } = req.params;
   try {
@@ -86,25 +61,6 @@ const getIccidByUserId = async (req, res) => {
         message: ` ${used_by} kullanıcısına ait ${data.length} adet ICCID bulundu`,
         data: data
       });
-    }
-  } catch (err) {
-    console.error("Error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-const getAll = async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('iccidTable')
-      .select('*');
-
-    if (error) throw error;
-
-    if (data.length === 0) {
-      res.json({ message: "ICCID kalmamış knk" });
-    } else {
-      res.json(data);
     }
   } catch (err) {
     console.error("Error:", err);
@@ -144,6 +100,25 @@ res.json({ message: `ICCID ${iccidid} status updated to ${status}` });
   console.error("Error:", err);
   res.status(500).json({ error: "Internal Server Error" });
 }
+};
+
+const getAll = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('*');
+
+    if (error) throw error;
+
+    if (data.length === 0) {
+      res.json({ message: "ICCID kalmamış knk" });
+    } else {
+      res.json(data);
+    }
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const addActivation = async (req, res) => {

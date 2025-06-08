@@ -25,4 +25,4 @@ components:
   schemas:
     $ref: './iccid.yaml#/components/schemas'
     $ref: './mernis.yaml#/components/schemas'
-    $ref: './user.yaml#/components/schemas' 
+    $ref: './user.yaml#/components/schemas'
