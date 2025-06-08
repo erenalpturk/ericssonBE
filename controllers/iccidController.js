@@ -25,41 +25,18 @@ const getIccid = async (req, res) => {
     }
 
     const iccid = data.iccid;
-
+    const iccidid = data.iccidid;
     // Update stock to reserved
     const { error: updateError } = await supabase
       .from('iccidTable')
       .update({ stock: 'reserved', used_by: used_by })
-      .eq('iccid', iccid)
+      .eq('iccidid', iccidid)
       .eq('type', type);
 
     if (updateError) throw updateError;
 
-    res.json(iccid);
+    res.json({iccidid, iccid});
     // Handle reservation timeout
-    if (reservationEnabled) {
-      setTimeout(async () => {
-        const { data: checkData } = await supabase
-          .from('iccidTable')
-          .select('stock')
-          .eq('iccid', iccid)
-          .eq('stock', 'reserved')
-          .single();
-
-        if (checkData) {
-          const { error: resetError } = await supabase
-            .from('iccidTable')
-            .update({ stock: 'available' })
-            .eq('iccid', iccid);
-
-          if (resetError) {
-            console.error("Error setting stock to available", resetError);
-          } else {
-            console.log(`ICCID ${iccid} is now available again`);
-          }
-        }
-      }, reservationTimeout || 300000);
-    }
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
