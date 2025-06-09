@@ -15,4 +15,5 @@ router.post("/mernisData/:type", mernisController.mernisData);
 router.post("/deleteSold", mernisController.deleteSold);
 router.post("/resetMernis", mernisController.resetMernis);
 
+
 module.exports = router;
