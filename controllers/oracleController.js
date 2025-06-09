@@ -159,6 +159,14 @@ const getActivationStatus = async (req, res) => {
   }
 
   try {
+    // Connection pool'un hazır olduğunu kontrol et
+    const { arePoolsInitialized } = require('../database/oracleConnection');
+    
+    if (!arePoolsInitialized()) {
+      console.log('Pools not initialized, initializing now...');
+      const { initializePools } = require('../database/oracleConnection');
+      await initializePools();
+    }
          // Oracle sorgusu çalıştır
     
     // Test 3: Ana sorgu farklı şekillerde deneyelim
@@ -247,6 +255,16 @@ const getBulkActivationStatus = async (req, res) => {
   }
 
   try {
+    // Connection pool'un hazır olduğunu kontrol et
+    const { arePoolsInitialized, getPoolStatus } = require('../database/oracleConnection');
+    
+    if (!arePoolsInitialized()) {
+      console.log('Pools not initialized, initializing now...');
+      const { initializePools } = require('../database/oracleConnection');
+      await initializePools();
+    }
+    
+    console.log('Pool Status:', getPoolStatus());
     // Oracle sorgusu ile birden fazla MSISDN'yi tek seferde sorgula
     const placeholders = msisdns.map((_, index) => `:msisdn${index}`).join(',');
     const query = `
@@ -333,6 +351,14 @@ const getLatestEncryptedSms = async (req, res) => {
   const { dbName = 'OMNI4' } = req.params;
   
   try {
+    // Connection pool'un hazır olduğunu kontrol et
+    const { arePoolsInitialized } = require('../database/oracleConnection');
+    
+    if (!arePoolsInitialized()) {
+      console.log('Pools not initialized, initializing now...');
+      const { initializePools } = require('../database/oracleConnection');
+      await initializePools();
+    }
     const query = `
       select tel_num, sms_val 
       from omni_bss.odf_sms_ntf 
@@ -364,6 +390,27 @@ const getLatestEncryptedSms = async (req, res) => {
   }
 };
 
+// Pool durumu kontrol endpoint'i
+const getPoolStatus = async (req, res) => {
+  try {
+    const { arePoolsInitialized, getPoolStatus } = require('../database/oracleConnection');
+    
+    res.json({
+      message: 'Oracle bağlantı havuzu durumu',
+      initialized: arePoolsInitialized(),
+      pools: getPoolStatus(),
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Pool status kontrolü hatası:', error);
+    res.status(500).json({ 
+      error: 'Pool status kontrol edilirken hata oluştu',
+      details: error.message
+    });
+  }
+};
+
 module.exports = {
   testQuery,
   executeCustomQuery,
@@ -371,5 +418,6 @@ module.exports = {
   checkAllConnections,
   getActivationStatus,
   getBulkActivationStatus,
-  getLatestEncryptedSms
+  getLatestEncryptedSms,
+  getPoolStatus
 }; 

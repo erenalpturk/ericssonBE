@@ -8,7 +8,8 @@ const {
   checkAllConnections,
   getActivationStatus,
   getBulkActivationStatus,
-  getLatestEncryptedSms
+  getLatestEncryptedSms,
+  getPoolStatus
 } = require('../controllers/oracleController');
 
 // Test sorgusu - örnek MSISDN sorgusu
@@ -31,5 +32,8 @@ router.post('/activation-status-bulk', getBulkActivationStatus);
 
 // Son 5 şifrelenmiş SMS getirme
 router.get('/encrypted-sms/:dbName?', getLatestEncryptedSms);
+
+// Pool durumu kontrol
+router.get('/pool-status', getPoolStatus);
 
 module.exports = router; 

@@ -80,10 +80,12 @@ const testConnection = async () => {
 // Initialize Oracle connections
 const initializeOracle = async () => {
   try {
+    console.log('🔄 Oracle bağlantı havuzları başlatılıyor...');
     await initializePools();
-    console.log('Oracle bağlantı havuzları başarıyla başlatıldı!');
+    console.log('✅ Oracle bağlantı havuzları başarıyla başlatıldı!');
   } catch (error) {
-    console.error('Oracle bağlantı havuzları başlatılırken hata:', error.message);
+    console.error('❌ Oracle bağlantı havuzları başlatılırken hata:', error.message);
+    console.log('⚠️  Oracle bağlantısı olmadan devam ediliyor. API çağrılarında otomatik bağlantı denenecek.');
   }
 };
 
