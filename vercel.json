@@ -1,8 +1,12 @@
 {
-    "version": 2,
+    "functions": {
+        "**/*.js": {
+            "maxDuration": 60
+        }
+    },
     "builds": [
         {
-            "src": "app.js",
+            "src": "**/*.js",
             "use": "@vercel/node"
         }
     ],
