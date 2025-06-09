@@ -46,32 +46,41 @@ const getIccid = async (req, res) => {
 const getIccidByUserId = async (req, res) => {
   const { used_by } = req.params;
   try {
-    const { data, error } = await supabase
+    // Önce ICCID'leri çek
+    const { data: iccidData, error: iccidError } = await supabase
       .from('iccidTable')
-      .select(`
-        *,
-        added_by_user:users!added_by(full_name),
-        used_by_user:users!used_by(full_name)
-      `)
+      .select('*')
       .eq('used_by', used_by)
       .order('updated_at', { ascending: false })
 
-    if (error) throw error;
+    if (iccidError) throw iccidError;
 
-    if (data.length === 0) {
+    if (iccidData.length === 0) {
       res.json({ message: `${used_by} kullanıcısı hiç iccid kullanmamış` });
     } else {
-      // users nesnelerinden full_name'leri çıkarıp ana nesneye ekle
-      const formattedData = data.map(item => ({
+      // Kullanıcı bilgilerini çek
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('sicil_no, full_name')
+        .in('sicil_no', [...new Set(iccidData.map(i => [i.added_by, i.used_by]).flat())]);
+
+      if (usersError) throw usersError;
+
+      // Kullanıcı bilgilerini map'le
+      const userMap = usersData.reduce((acc, user) => {
+        acc[user.sicil_no] = user.full_name;
+        return acc;
+      }, {});
+
+      // Verileri birleştir
+      const formattedData = iccidData.map(item => ({
         ...item,
-        added_by_name: item.added_by_user?.full_name,
-        used_by_name: item.used_by_user?.full_name,
-        added_by_user: undefined,
-        used_by_user: undefined
+        added_by_name: userMap[item.added_by] || 'Bilinmeyen Kullanıcı',
+        used_by_name: userMap[item.used_by] || 'Bilinmeyen Kullanıcı'
       }));
 
       res.json({
-        message: ` ${used_by} kullanıcısına ait ${data.length} adet ICCID bulundu`,
+        message: ` ${used_by} kullanıcısına ait ${iccidData.length} adet ICCID bulundu`,
         data: formattedData
       });
     }
@@ -117,26 +126,35 @@ res.json({ message: `ICCID ${iccidid} status updated to ${status}` });
 
 const getAll = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    // Önce ICCID'leri çek
+    const { data: iccidData, error: iccidError } = await supabase
       .from('iccidTable')
-      .select(`
-        *,
-        added_by_user:users!added_by(full_name),
-        used_by_user:users!used_by(full_name)
-      `);
+      .select('*');
 
-    if (error) throw error;
+    if (iccidError) throw iccidError;
 
-    if (data.length === 0) {
+    if (iccidData.length === 0) {
       res.json({ message: "ICCID kalmamış knk" });
     } else {
-      // users nesnelerinden full_name'leri çıkarıp ana nesneye ekle
-      const formattedData = data.map(item => ({
+      // Kullanıcı bilgilerini çek
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('sicil_no, full_name')
+        .in('sicil_no', [...new Set(iccidData.map(i => [i.added_by, i.used_by]).flat())]);
+
+      if (usersError) throw usersError;
+
+      // Kullanıcı bilgilerini map'le
+      const userMap = usersData.reduce((acc, user) => {
+        acc[user.sicil_no] = user.full_name;
+        return acc;
+      }, {});
+
+      // Verileri birleştir
+      const formattedData = iccidData.map(item => ({
         ...item,
-        added_by_name: item.added_by_user?.full_name,
-        used_by_name: item.used_by_user?.full_name,
-        added_by_user: undefined,
-        used_by_user: undefined
+        added_by_name: userMap[item.added_by] || 'Bilinmeyen Kullanıcı',
+        used_by_name: userMap[item.used_by] || 'Bilinmeyen Kullanıcı'
       }));
 
       res.json(formattedData);
@@ -183,29 +201,42 @@ const addActivation = async (req, res) => {
 const getActivations = async (req, res) => {
   const { user } = req.params;
   try {
-    const { data, error } = await supabase
+    // Önce aktivasyonları çek
+    const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
       .select(`
         *,
-        gnl_parm!inner(value),
-        users!inner(full_name)
+        gnl_parm!inner(value)
       `)
       .eq('user', user)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (activationsError) throw activationsError;
 
-    if (!data.length) {
+    if (!activationsData.length) {
       return res.json({ message: "Data çıkmamışsın knk" });
     }
 
-    // gnl_parm ve users nesnelerinden değerleri çıkarıp ana nesneye ekle
-    const formattedData = data.map(item => ({
+    // Kullanıcı bilgilerini çek
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', activationsData.map(a => a.user));
+
+    if (usersError) throw usersError;
+
+    // Kullanıcı bilgilerini map'le
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.sicil_no] = user.full_name;
+      return acc;
+    }, {});
+
+    // Verileri birleştir
+    const formattedData = activationsData.map(item => ({
       ...item,
       tariff_name: item.gnl_parm?.value,
-      full_name: item.users?.full_name,
-      gnl_parm: undefined, // gnl_parm nesnesini kaldır
-      users: undefined // users nesnesini kaldır
+      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı',
+      gnl_parm: undefined
     }));
 
     res.json(formattedData);
@@ -218,26 +249,39 @@ const getActivations = async (req, res) => {
 
 const getActivationsPublic = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    // Önce aktivasyonları çek
+    const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
-      .select(`
-        *,
-        users!inner(full_name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
-    if (error) throw error;
 
-    if (data.length === 0) {
-      res.json({ message: "Datan kalmamış knk" });
-    } else {
-      // users nesnesinden full_name'i çıkarıp ana nesneye ekle
-      const formattedData = data.map(item => ({
-        ...item,
-        full_name: item.users?.full_name,
-        users: undefined // users nesnesini kaldır
-      }));
-      res.json(formattedData);
+    if (activationsError) throw activationsError;
+
+    if (activationsData.length === 0) {
+      return res.json({ message: "Datan kalmamış knk" });
     }
+
+    // Kullanıcı bilgilerini çek
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', activationsData.map(a => a.user));
+
+    if (usersError) throw usersError;
+
+    // Kullanıcı bilgilerini map'le
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.sicil_no] = user.full_name;
+      return acc;
+    }, {});
+
+    // Verileri birleştir
+    const formattedData = activationsData.map(item => ({
+      ...item,
+      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
+    }));
+
+    res.json(formattedData);
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
