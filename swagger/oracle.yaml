@@ -1,0 +1,203 @@
+paths:
+  /oracle/test/{msisdn}/{dbName}:
+    get:
+      tags:
+        - Oracle
+      summary: Test MSISDN sorgusu
+      description: Belirli bir MSISDN için örnek Oracle sorgusu çalıştırır
+      parameters:
+        - name: msisdn
+          in: path
+          required: true
+          description: Sorgulanacak MSISDN numarası
+          schema:
+            type: string
+            example: "5070036041"
+        - name: dbName
+          in: path
+          required: false
+          description: Kullanılacak veritabanı (OMNI, OMNI2, OMNI3, OMNI4, OMNI5)
+          schema:
+            type: string
+            enum: [OMNI, OMNI2, OMNI3, OMNI4, OMNI5]
+            default: OMNI4
+      responses:
+        200:
+          description: Sorgu başarıyla çalıştırıldı
+        404:
+          description: Veri bulunamadı
+        500:
+          description: Sunucu hatası
+
+  /oracle/query:
+    post:
+      tags:
+        - Oracle
+      summary: Özel SQL sorgusu çalıştır
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Çalıştırılacak SQL sorgusu
+                  example: "SELECT SYSDATE FROM DUAL"
+                params:
+                  type: array
+                  items:
+                    type: string
+                  description: Sorgu parametreleri
+                  example: []
+                dbName:
+                  type: string
+                  enum: [OMNI, OMNI2, OMNI3, OMNI4, OMNI5]
+                  default: OMNI4
+                  description: Kullanılacak veritabanı
+      responses:
+        200:
+          description: Sorgu başarıyla çalıştırıldı
+        400:
+          description: Geçersiz istek
+        500:
+          description: Sunucu hatası
+
+  /oracle/health/{dbName}:
+    get:
+      tags:
+        - Oracle
+      summary: Veritabanı bağlantı testi
+      parameters:
+        - name: dbName
+          in: path
+          required: false
+          description: Test edilecek veritabanı
+          schema:
+            type: string
+            enum: [OMNI, OMNI2, OMNI3, OMNI4, OMNI5]
+            default: OMNI4
+      responses:
+        200:
+          description: Bağlantı başarılı
+        500:
+          description: Bağlantı başarısız
+
+  /oracle/health-all:
+    get:
+      tags:
+        - Oracle
+      summary: Tüm veritabanları bağlantı testi
+      responses:
+        200:
+          description: Tüm veritabanları test edildi
+
+  /oracle/activation-status/{msisdn}/{dbName}:
+    get:
+      tags:
+        - Oracle
+      summary: MSISDN Aktiflik/Pasiflik Durumu
+      description: Belirli bir MSISDN için aktiflik/pasiflik durumunu Oracle'dan sorgular
+      parameters:
+        - name: msisdn
+          in: path
+          required: true
+          description: Sorgulanacak MSISDN numarası
+          schema:
+            type: string
+            example: "5070036041"
+        - name: dbName
+          in: path
+          required: false
+          description: Kullanılacak veritabanı (OMNI, OMNI2, OMNI3, OMNI4, OMNI5)
+          schema:
+            type: string
+            enum: [OMNI, OMNI2, OMNI3, OMNI4, OMNI5]
+            default: OMNI4
+      responses:
+        200:
+          description: Aktiflik durumu başarıyla sorgulandı
+        400:
+          description: Geçersiz istek
+
+  /oracle/activation-status-bulk:
+    post:
+      tags:
+        - Oracle
+      summary: Bulk MSISDN Aktiflik/Pasiflik Durumu
+      description: Birden fazla MSISDN için aktiflik/pasiflik durumunu tek seferde Oracle'dan sorgular
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - msisdns
+              properties:
+                msisdns:
+                  type: array
+                  items:
+                    type: string
+                  description: Sorgulanacak MSISDN numaraları
+                  example: ["5070036041", "5070036042", "5070036043"]
+                dbName:
+                  type: string
+                  enum: [OMNI, OMNI2, OMNI3, OMNI4, OMNI5]
+                  default: OMNI4
+                  description: Kullanılacak veritabanı
+      responses:
+        200:
+          description: Bulk aktiflik durumu başarıyla sorgulandı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  database:
+                    type: string
+                  foundCount:
+                    type: integer
+                  results:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        msisdn:
+                          type: string
+                        status:
+                          type: string
+                        statusType:
+                          type: string
+                        val:
+                          type: string
+        400:
+          description: Geçersiz istek
+        500:
+          description: Sunucu hatası
+
+components:
+  schemas:
+    OracleQueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: SQL sorgusu
+        params:
+          type: array
+          items:
+            type: string
+          description: Sorgu parametreleri
+        dbName:
+          type: string
+          enum: [OMNI, OMNI2, OMNI3, OMNI4, OMNI5]
+          default: OMNI4
+          description: Veritabanı adı 
