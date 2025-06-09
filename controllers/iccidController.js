@@ -46,20 +46,42 @@ const getIccid = async (req, res) => {
 const getIccidByUserId = async (req, res) => {
   const { used_by } = req.params;
   try {
-    const { data, error } = await supabase
+    // Önce ICCID'leri çek
+    const { data: iccidData, error: iccidError } = await supabase
       .from('iccidTable')
       .select('*')
       .eq('used_by', used_by)
       .order('updated_at', { ascending: false })
 
-    if (error) throw error;
+    if (iccidError) throw iccidError;
 
-    if (data.length === 0) {
+    if (iccidData.length === 0) {
       res.json({ message: `${used_by} kullanıcısı hiç iccid kullanmamış` });
     } else {
+      // Kullanıcı bilgilerini çek
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('sicil_no, full_name')
+        .in('sicil_no', [...new Set(iccidData.map(i => [i.added_by, i.used_by]).flat())]);
+
+      if (usersError) throw usersError;
+
+      // Kullanıcı bilgilerini map'le
+      const userMap = usersData.reduce((acc, user) => {
+        acc[user.sicil_no] = user.full_name;
+        return acc;
+      }, {});
+
+      // Verileri birleştir
+      const formattedData = iccidData.map(item => ({
+        ...item,
+        added_by_name: userMap[item.added_by] || 'Bilinmeyen Kullanıcı',
+        used_by_name: userMap[item.used_by] || 'Bilinmeyen Kullanıcı'
+      }));
+
       res.json({
-        message: ` ${used_by} kullanıcısına ait ${data.length} adet ICCID bulundu`,
-        data: data
+        message: ` ${used_by} kullanıcısına ait ${iccidData.length} adet ICCID bulundu`,
+        data: formattedData
       });
     }
   } catch (err) {
@@ -104,16 +126,38 @@ res.json({ message: `ICCID ${iccidid} status updated to ${status}` });
 
 const getAll = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    // Önce ICCID'leri çek
+    const { data: iccidData, error: iccidError } = await supabase
       .from('iccidTable')
       .select('*');
 
-    if (error) throw error;
+    if (iccidError) throw iccidError;
 
-    if (data.length === 0) {
+    if (iccidData.length === 0) {
       res.json({ message: "ICCID kalmamış knk" });
     } else {
-      res.json(data);
+      // Kullanıcı bilgilerini çek
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('sicil_no, full_name')
+        .in('sicil_no', [...new Set(iccidData.map(i => [i.added_by, i.used_by]).flat())]);
+
+      if (usersError) throw usersError;
+
+      // Kullanıcı bilgilerini map'le
+      const userMap = usersData.reduce((acc, user) => {
+        acc[user.sicil_no] = user.full_name;
+        return acc;
+      }, {});
+
+      // Verileri birleştir
+      const formattedData = iccidData.map(item => ({
+        ...item,
+        added_by_name: userMap[item.added_by] || 'Bilinmeyen Kullanıcı',
+        used_by_name: userMap[item.used_by] || 'Bilinmeyen Kullanıcı'
+      }));
+
+      res.json(formattedData);
     }
   } catch (err) {
     console.error("Error:", err);
@@ -157,26 +201,52 @@ const addActivation = async (req, res) => {
 const getActivations = async (req, res) => {
   const { user } = req.params;
   try {
-    const { data, error } = await supabase
+    // Önce aktivasyonları çek
+    const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
-      .select(`
-        *,
-        gnl_parm!inner(value)
-      `)
+      .select('*')
       .eq('user', user)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (activationsError) throw activationsError;
 
-    if (!data.length) {
+    if (!activationsData.length) {
       return res.json({ message: "Data çıkmamışsın knk" });
     }
 
-    // gnl_parm nesnesinden value değerini çıkarıp ana nesneye ekle
-    const formattedData = data.map(item => ({
+    // Kullanıcı bilgilerini çek
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', activationsData.map(a => a.user));
+
+    if (usersError) throw usersError;
+
+    // Tarife bilgilerini çek
+    const { data: tariffData, error: tariffError } = await supabase
+      .from('gnl_parm')
+      .select('id, value')
+      .in('id', activationsData.map(a => a.prod_ofr_id));
+
+    if (tariffError) throw tariffError;
+
+    // Kullanıcı bilgilerini map'le
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.sicil_no] = user.full_name;
+      return acc;
+    }, {});
+
+    // Tarife bilgilerini map'le
+    const tariffMap = tariffData.reduce((acc, tariff) => {
+      acc[tariff.id] = tariff.value;
+      return acc;
+    }, {});
+
+    // Verileri birleştir
+    const formattedData = activationsData.map(item => ({
       ...item,
-      tariff_name: item.gnl_parm?.value,
-      gnl_parm: undefined // gnl_parm nesnesini kaldır
+      tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
+      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
     }));
 
     res.json(formattedData);
@@ -189,18 +259,54 @@ const getActivations = async (req, res) => {
 
 const getActivationsPublic = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    // Önce aktivasyonları çek
+    const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
       .select('*')
-      .not('user', 'in', '(alp, enes)')
       .order('created_at', { ascending: false });
-    if (error) throw error;
 
-    if (data.length === 0) {
-      res.json({ message: "Datan kalmamış knk" });
-    } else {
-      res.json(data);
+    if (activationsError) throw activationsError;
+
+    if (activationsData.length === 0) {
+      return res.json({ message: "Datan kalmamış knk" });
     }
+
+    // Kullanıcı bilgilerini çek
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', activationsData.map(a => a.user));
+
+    if (usersError) throw usersError;
+
+    // Tarife bilgilerini çek
+    const { data: tariffData, error: tariffError } = await supabase
+      .from('gnl_parm')
+      .select('id, value')
+      .in('id', activationsData.map(a => a.prod_ofr_id));
+
+    if (tariffError) throw tariffError;
+
+    // Kullanıcı bilgilerini map'le
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.sicil_no] = user.full_name;
+      return acc;
+    }, {});
+
+    // Tarife bilgilerini map'le
+    const tariffMap = tariffData.reduce((acc, tariff) => {
+      acc[tariff.id] = tariff.value;
+      return acc;
+    }, {});
+
+    // Verileri birleştir
+    const formattedData = activationsData.map(item => ({
+      ...item,
+      tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
+      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
+    }));
+
+    res.json(formattedData);
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
