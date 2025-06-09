@@ -16,7 +16,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const iccidRoutes = require('./routes/iccidRoutes');
 const userRoutes = require('./routes/userRoutes');
 const mernisRoutes = require('./routes/mernisRoutes');
-const oracleRoutes = require('./routes/oracleRoutes');
+// const oracleRoutes = require('./routes/oracleRoutes');
 
 // Middleware
 app.use(cors());
@@ -28,14 +28,14 @@ app.use(express.text()); // For text body parsing
 app.use('/iccid', iccidRoutes);
 app.use('/mernis', mernisRoutes);
 app.use('/user', userRoutes);
-app.use('/oracle', oracleRoutes);
+// app.use('/oracle', oracleRoutes);
 
 // Swagger yapılandırması
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger/index.yaml'));
 const iccidSpec = YAML.load(path.join(__dirname, 'swagger/iccid.yaml'));
 const mernisSpec = YAML.load(path.join(__dirname, 'swagger/mernis.yaml'));
 const userSpec = YAML.load(path.join(__dirname, 'swagger/user.yaml'));
-const oracleSpec = YAML.load(path.join(__dirname, 'swagger/oracle.yaml'));
+// const oracleSpec = YAML.load(path.join(__dirname, 'swagger/oracle.yaml'));
 
 // Tüm spesifikasyonları birleştir
 swaggerDocument.paths = {
@@ -43,7 +43,7 @@ swaggerDocument.paths = {
   ...iccidSpec.paths,
   ...mernisSpec.paths,
   ...userSpec.paths,
-  ...oracleSpec.paths
+  // ...oracleSpec.paths
 };
 
 swaggerDocument.components = {
@@ -53,7 +53,7 @@ swaggerDocument.components = {
     ...iccidSpec.components?.schemas,
     ...mernisSpec.components?.schemas,
     ...userSpec.components?.schemas,
-    ...oracleSpec.components?.schemas
+    // ...oracleSpec.components?.schemas
   }
 };
 
@@ -78,22 +78,22 @@ const testConnection = async () => {
 };
 
 // Initialize Oracle connections
-const initializeOracle = async () => {
-  try {
-    console.log('🔄 Oracle bağlantı havuzları başlatılıyor...');
-    await initializePools();
-    console.log('✅ Oracle bağlantı havuzları başarıyla başlatıldı!');
-  } catch (error) {
-    console.error('❌ Oracle bağlantı havuzları başlatılırken hata:', error.message);
-    console.log('⚠️  Oracle bağlantısı olmadan devam ediliyor. API çağrılarında otomatik bağlantı denenecek.');
-  }
-};
+// const initializeOracle = async () => {
+//   try {
+//     console.log('🔄 Oracle bağlantı havuzları başlatılıyor...');
+//     await initializePools();
+//     console.log('✅ Oracle bağlantı havuzları başarıyla başlatıldı!');
+//   } catch (error) {
+//     console.error('❌ Oracle bağlantı havuzları başlatılırken hata:', error.message);
+//     console.log('⚠️  Oracle bağlantısı olmadan devam ediliyor. API çağrılarında otomatik bağlantı denenecek.');
+//   }
+// };
 
 // Server setup
 const PORT = process.env.PORT || 5432;
 app.listen(PORT, async () => {
   testConnection();
-  await initializeOracle();
+  // await initializeOracle();
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 
