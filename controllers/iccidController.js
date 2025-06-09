@@ -161,7 +161,8 @@ const getActivations = async (req, res) => {
       .from('activationstable')
       .select(`
         *,
-        gnl_parm!inner(value)
+        gnl_parm!inner(value),
+        users!inner(full_name)
       `)
       .eq('user', user)
       .order('created_at', { ascending: false });
@@ -172,11 +173,13 @@ const getActivations = async (req, res) => {
       return res.json({ message: "Data çıkmamışsın knk" });
     }
 
-    // gnl_parm nesnesinden value değerini çıkarıp ana nesneye ekle
+    // gnl_parm ve users nesnelerinden değerleri çıkarıp ana nesneye ekle
     const formattedData = data.map(item => ({
       ...item,
       tariff_name: item.gnl_parm?.value,
-      gnl_parm: undefined // gnl_parm nesnesini kaldır
+      full_name: item.users?.full_name,
+      gnl_parm: undefined, // gnl_parm nesnesini kaldır
+      users: undefined // users nesnesini kaldır
     }));
 
     res.json(formattedData);
@@ -191,15 +194,23 @@ const getActivationsPublic = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('activationstable')
-      .select('*')
-      .not('user', 'in', '(alp, enes)')
+      .select(`
+        *,
+        users!inner(full_name)
+      `)
       .order('created_at', { ascending: false });
     if (error) throw error;
 
     if (data.length === 0) {
       res.json({ message: "Datan kalmamış knk" });
     } else {
-      res.json(data);
+      // users nesnesinden full_name'i çıkarıp ana nesneye ekle
+      const formattedData = data.map(item => ({
+        ...item,
+        full_name: item.users?.full_name,
+        users: undefined // users nesnesini kaldır
+      }));
+      res.json(formattedData);
     }
   } catch (err) {
     console.error("Error:", err);
