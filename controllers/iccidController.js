@@ -48,7 +48,11 @@ const getIccidByUserId = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('iccidTable')
-      .select('*')
+      .select(`
+        *,
+        added_by_user:users!added_by(full_name),
+        used_by_user:users!used_by(full_name)
+      `)
       .eq('used_by', used_by)
       .order('updated_at', { ascending: false })
 
@@ -57,9 +61,18 @@ const getIccidByUserId = async (req, res) => {
     if (data.length === 0) {
       res.json({ message: `${used_by} kullanıcısı hiç iccid kullanmamış` });
     } else {
+      // users nesnelerinden full_name'leri çıkarıp ana nesneye ekle
+      const formattedData = data.map(item => ({
+        ...item,
+        added_by_name: item.added_by_user?.full_name,
+        used_by_name: item.used_by_user?.full_name,
+        added_by_user: undefined,
+        used_by_user: undefined
+      }));
+
       res.json({
         message: ` ${used_by} kullanıcısına ait ${data.length} adet ICCID bulundu`,
-        data: data
+        data: formattedData
       });
     }
   } catch (err) {
@@ -106,14 +119,27 @@ const getAll = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('iccidTable')
-      .select('*');
+      .select(`
+        *,
+        added_by_user:users!added_by(full_name),
+        used_by_user:users!used_by(full_name)
+      `);
 
     if (error) throw error;
 
     if (data.length === 0) {
       res.json({ message: "ICCID kalmamış knk" });
     } else {
-      res.json(data);
+      // users nesnelerinden full_name'leri çıkarıp ana nesneye ekle
+      const formattedData = data.map(item => ({
+        ...item,
+        added_by_name: item.added_by_user?.full_name,
+        used_by_name: item.used_by_user?.full_name,
+        added_by_user: undefined,
+        used_by_user: undefined
+      }));
+
+      res.json(formattedData);
     }
   } catch (err) {
     console.error("Error:", err);
