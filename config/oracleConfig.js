@@ -8,7 +8,9 @@ const oracleConfigs = {
     poolMax: 10,
     poolIncrement: 1,
     poolTimeout: 30,
-    stmtCacheSize: 30
+    stmtCacheSize: 30,
+    connectTimeout: 10,
+    callTimeout: 20000
   },
   OMNI2: {
     user: 'OTOPERF',
@@ -18,7 +20,9 @@ const oracleConfigs = {
     poolMax: 10,
     poolIncrement: 1,
     poolTimeout: 30,
-    stmtCacheSize: 30
+    stmtCacheSize: 30,
+    connectTimeout: 10,
+    callTimeout: 20000
   },
   OMNI3: {
     user: 'OTOPERF',
@@ -28,7 +32,9 @@ const oracleConfigs = {
     poolMax: 10,
     poolIncrement: 1,
     poolTimeout: 30,
-    stmtCacheSize: 30
+    stmtCacheSize: 30,
+    connectTimeout: 10,
+    callTimeout: 20000
   },
   OMNI4: {
     user: 'OTOPERF',
@@ -38,7 +44,9 @@ const oracleConfigs = {
     poolMax: 10,
     poolIncrement: 1,
     poolTimeout: 30,
-    stmtCacheSize: 30
+    stmtCacheSize: 30,
+    connectTimeout: 10,
+    callTimeout: 20000
   },
   OMNI5: {
     user: 'OTOPERF',
@@ -48,7 +56,9 @@ const oracleConfigs = {
     poolMax: 10,
     poolIncrement: 1,
     poolTimeout: 30,
-    stmtCacheSize: 30
+    stmtCacheSize: 30,
+    connectTimeout: 10,
+    callTimeout: 20000
   }
 };
 
