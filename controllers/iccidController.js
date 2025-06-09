@@ -204,10 +204,7 @@ const getActivations = async (req, res) => {
     // Önce aktivasyonları çek
     const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
-      .select(`
-        *,
-        gnl_parm!inner(value)
-      `)
+      .select('*')
       .eq('user', user)
       .order('created_at', { ascending: false });
 
@@ -225,18 +222,31 @@ const getActivations = async (req, res) => {
 
     if (usersError) throw usersError;
 
+    // Tarife bilgilerini çek
+    const { data: tariffData, error: tariffError } = await supabase
+      .from('gnl_parm')
+      .select('id, value')
+      .in('id', activationsData.map(a => a.prod_ofr_id));
+
+    if (tariffError) throw tariffError;
+
     // Kullanıcı bilgilerini map'le
     const userMap = usersData.reduce((acc, user) => {
       acc[user.sicil_no] = user.full_name;
       return acc;
     }, {});
 
+    // Tarife bilgilerini map'le
+    const tariffMap = tariffData.reduce((acc, tariff) => {
+      acc[tariff.id] = tariff.value;
+      return acc;
+    }, {});
+
     // Verileri birleştir
     const formattedData = activationsData.map(item => ({
       ...item,
-      tariff_name: item.gnl_parm?.value,
-      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı',
-      gnl_parm: undefined
+      tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
+      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
     }));
 
     res.json(formattedData);
@@ -269,15 +279,30 @@ const getActivationsPublic = async (req, res) => {
 
     if (usersError) throw usersError;
 
+    // Tarife bilgilerini çek
+    const { data: tariffData, error: tariffError } = await supabase
+      .from('gnl_parm')
+      .select('id, value')
+      .in('id', activationsData.map(a => a.prod_ofr_id));
+
+    if (tariffError) throw tariffError;
+
     // Kullanıcı bilgilerini map'le
     const userMap = usersData.reduce((acc, user) => {
       acc[user.sicil_no] = user.full_name;
       return acc;
     }, {});
 
+    // Tarife bilgilerini map'le
+    const tariffMap = tariffData.reduce((acc, tariff) => {
+      acc[tariff.id] = tariff.value;
+      return acc;
+    }, {});
+
     // Verileri birleştir
     const formattedData = activationsData.map(item => ({
       ...item,
+      tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
       full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
     }));
 
