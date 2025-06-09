@@ -72,17 +72,32 @@ const getConnection = async (dbName = 'OMNI') => {
   }
 };
 
-// Execute query with connection management
-const executeQuery = async (query, params = [], dbName = 'OMNI') => {
+// Execute query with connection management and timeout
+const executeQuery = async (query, params = [], dbName = 'OMNI', timeoutMs = 30000) => {
   let connection;
   try {
-    connection = await getConnection(dbName);
-    const result = await connection.execute(query, params, {
-      outFormat: oracledb.OUT_FORMAT_OBJECT
+    // Timeout wrapper for the entire query operation
+    const queryPromise = (async () => {
+      connection = await getConnection(dbName);
+      const result = await connection.execute(query, params, {
+        outFormat: oracledb.OUT_FORMAT_OBJECT
+      });
+      return result;
+    })();
+
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Query timeout after ${timeoutMs}ms for database ${dbName}`));
+      }, timeoutMs);
     });
+
+    // Race between query and timeout
+    const result = await Promise.race([queryPromise, timeoutPromise]);
     return result;
+    
   } catch (error) {
-    console.error('Sorgu çalıştırılırken hata:', error.message);
+    console.error(`Sorgu çalıştırılırken hata (${dbName}):`, error.message);
     throw error;
   } finally {
     if (connection) {

@@ -9,7 +9,8 @@ const {
   getActivationStatus,
   getBulkActivationStatus,
   getLatestEncryptedSms,
-  getPoolStatus
+  getPoolStatus,
+  quickHealthCheck
 } = require('../controllers/oracleController');
 
 // Test sorgusu - örnek MSISDN sorgusu
@@ -35,5 +36,8 @@ router.get('/encrypted-sms/:dbName?', getLatestEncryptedSms);
 
 // Pool durumu kontrol
 router.get('/pool-status', getPoolStatus);
+
+// Quick health check
+router.get('/health-quick', quickHealthCheck);
 
 module.exports = router; 

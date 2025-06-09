@@ -287,9 +287,11 @@ const getBulkActivationStatus = async (req, res) => {
       return acc;
     }, {});
     
-    console.log('Bulk query for MSISDNs:', msisdns.slice(0, 5), '...'); // İlk 5'ini log'la
+    console.log(`Bulk query for ${msisdns.length} MSISDNs on ${dbName}`);
+    console.log('Sample MSISDNs:', msisdns.slice(0, 3), '...');
     
-    const result = await executeQuery(query, params, dbName);
+    // Shorter timeout for bulk queries
+    const result = await executeQuery(query, params, dbName, 25000);
     
     // Sonuçları map'le ve eksik olan MSISDN'ler için default değer ver
     const statusMap = {};
@@ -337,11 +339,33 @@ const getBulkActivationStatus = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Oracle bulk aktiflik sorgu hatası:', error);
+    console.error('Oracle bulk aktiflik sorgu hatası:', error.message);
+    
+    // Timeout durumunda partial response döndür
+    if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+      const statusMap = {};
+      msisdns.forEach(msisdn => {
+        statusMap[msisdn] = {
+          msisdn: msisdn,
+          status: 'Timeout',
+          statusType: 'timeout',
+          message: 'Sorgu zaman aşımına uğradı'
+        };
+      });
+      
+      return res.json({
+        message: `Timeout nedeniyle ${msisdns.length} MSISDN için varsayılan değer döndürüldü`,
+        database: dbName,
+        foundCount: 0,
+        results: statusMap,
+        warning: 'Query timeout occurred'
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Oracle bulk sorgusu çalıştırılırken hata oluştu',
       details: error.message,
-      errorCode: error.errorNum
+      errorCode: error.errorNum || 'UNKNOWN'
     });
   }
 };
@@ -368,7 +392,7 @@ const getLatestEncryptedSms = async (req, res) => {
     
     console.log(`Getting latest encrypted SMS from ${dbName}`);
     
-    const result = await executeQuery(query, [], dbName);
+    const result = await executeQuery(query, [], dbName, 20000);
     
     res.json({
       message: `${dbName} veritabanından son 5 şifrelenmiş SMS alındı`,
@@ -399,7 +423,8 @@ const getPoolStatus = async (req, res) => {
       message: 'Oracle bağlantı havuzu durumu',
       initialized: arePoolsInitialized(),
       pools: getPoolStatus(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
     });
     
   } catch (error) {
@@ -407,6 +432,40 @@ const getPoolStatus = async (req, res) => {
     res.status(500).json({ 
       error: 'Pool status kontrol edilirken hata oluştu',
       details: error.message
+    });
+  }
+};
+
+// Quick health check endpoint
+const quickHealthCheck = async (req, res) => {
+  try {
+    const { arePoolsInitialized } = require('../database/oracleConnection');
+    
+    if (!arePoolsInitialized()) {
+      return res.status(503).json({
+        status: 'unhealthy',
+        message: 'Oracle pools not initialized',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Quick DUAL query to check connection
+    const result = await executeQuery('SELECT 1 as health FROM DUAL', [], 'OMNI4', 5000);
+    
+    res.json({
+      status: 'healthy',
+      message: 'Oracle connection is working',
+      queryResult: result.rows[0],
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Health check hatası:', error);
+    res.status(503).json({ 
+      status: 'unhealthy',
+      error: 'Oracle health check failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -419,5 +478,6 @@ module.exports = {
   getActivationStatus,
   getBulkActivationStatus,
   getLatestEncryptedSms,
-  getPoolStatus
+  getPoolStatus,
+  quickHealthCheck
 }; 
