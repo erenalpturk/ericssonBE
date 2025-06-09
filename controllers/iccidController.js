@@ -271,7 +271,6 @@ const getActivationsPublic = async (req, res) => {
       return res.json({ message: "Datan kalmamış knk" });
     }
 
-    // Kullanıcı bilgilerini çek
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select('sicil_no, full_name')
