@@ -107,7 +107,11 @@ const updateIccid = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('iccidTable')
-      .update({ stock: status, used_by: used_by })
+      .update({ 
+        stock: status, 
+        used_by: used_by,
+        updated_at: new Date().toISOString()
+      })
       .eq('iccidid', iccidid)
       .select();
 
