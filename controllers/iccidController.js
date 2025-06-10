@@ -105,27 +105,33 @@ const updateIccid = async (req, res) => {
   }
 
   try {
+    // Sadece gelen alanları güncelle
+    const updateData = {
+      updated_at: new Date().toISOString()
+    };
+    updateData.stock = status;
+    if (used_by) updateData.used_by = used_by;
+
     const { data, error } = await supabase
       .from('iccidTable')
-      .update({ 
-        stock: status, 
-        used_by: used_by,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('iccidid', iccidid)
       .select();
 
-if (error) throw error;
+    if (error) throw error;
 
-if (!data || data.length === 0) {
-  return res.status(404).json({ error: `ICCID ${iccidid} not found` });
-}
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: `ICCID ${iccidid} not found` });
+    }
 
-res.json({ message: `ICCID ${iccidid} status updated to ${status}` });
+    res.json({
+      message: `ICCID ${iccidid} status updated to ${status}`,
+      data: data[0]
+    });
   } catch (err) {
-  console.error("Error:", err);
-  res.status(500).json({ error: "Internal Server Error" });
-}
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const getAll = async (req, res) => {
