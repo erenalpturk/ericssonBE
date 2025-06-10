@@ -457,72 +457,198 @@ const resetIccid = async (req, res) => {
 
 const getStats = async (req, res) => {
   try {
-    // Get activations statistics
-    const { data: activationsData, error: activationsError } = await supabase
-      .from('activationstable')
-      .select('activationType');
-
-    if (activationsError) throw activationsError;
-
-    const totalActivations = activationsData.length;
-
-    // Group by activationType
-    const activationTypes = activationsData.reduce((acc, curr) => {
-      acc[curr.activationType] = (acc[curr.activationType] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Get ICCID statistics
-    const { data: iccidData, error: iccidError } = await supabase
+    // Genel İstatistikler
+    const { data: totalIccids, error: totalError } = await supabase
       .from('iccidTable')
-      .select('stock');
+      .select('stock', { count: 'exact' });
 
-    if (iccidError) throw iccidError;
+    if (totalError) throw totalError;
 
-    const totalIccids = iccidData.length;
+    // Stok durumuna göre ICCID sayıları
+    const { data: stockStats, error: stockError } = await supabase
+      .from('iccidTable')
+      .select('stock')
+      .then(result => {
+        const stats = {
+          available: 0,
+          sold: 0,
+          reserved: 0
+        };
+        result.data.forEach(item => {
+          stats[item.stock] = (stats[item.stock] || 0) + 1;
+        });
+        return { data: stats, error: null };
+      });
 
-    // Group by stock status
-    const iccidStock = iccidData.reduce((acc, curr) => {
-      acc[curr.stock] = (acc[curr.stock] || 0) + 1;
+    if (stockError) throw stockError;
+
+    // Aktivasyon İstatistikleri
+    const { data: activationStats, error: activationError } = await supabase
+      .from('activationstable')
+      .select('*');
+
+    if (activationError) throw activationError;
+
+    // Aktivasyon tiplerine göre dağılım
+    const activationTypeStats = activationStats.reduce((acc, curr) => {
+      acc[curr.activationtype] = (acc[curr.activationtype] || 0) + 1;
       return acc;
     }, {});
 
-    // Get Mernis statistics
-    const { data: mernisData, error: mernisError } = await supabase
-      .from('mernisTable')
-      .select('stock');
+    // Tarifelere göre dağılım
+    const { data: tariffData, error: tariffError } = await supabase
+      .from('gnl_parm')
+      .select('id, value');
 
-    if (mernisError) throw mernisError;
+    if (tariffError) throw tariffError;
 
-    const totalMernis = mernisData.length;
-
-    // Group by stock status
-    const mernisTypes = mernisData.reduce((acc, curr) => {
-      acc[curr.stock] = (acc[curr.stock] || 0) + 1;
+    const tariffMap = tariffData.reduce((acc, curr) => {
+      acc[curr.id] = curr.value;
       return acc;
     }, {});
+
+    const tariffStats = activationStats.reduce((acc, curr) => {
+      acc[tariffMap[curr.prod_ofr_id] || 'Bilinmeyen Tarife'] = (acc[tariffMap[curr.prod_ofr_id] || 'Bilinmeyen Tarife'] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Zaman bazlı istatistikler
+    const now = new Date();
+    const last24Hours = new Date(now - 24 * 60 * 60 * 1000);
+    const last7Days = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const timeBasedStats = {
+      last24Hours: activationStats.filter(a => new Date(a.created_at) > last24Hours).length,
+      last7Days: activationStats.filter(a => new Date(a.created_at) > last7Days).length,
+      last30Days: activationStats.filter(a => new Date(a.created_at) > last30Days).length
+    };
+
+    // Kullanıcı bazlı detaylı istatistikler
+    const userStats = {};
+    const users = await supabase
+      .from('users')
+      .select('*');
+    
+    for (const user of users.data) {
+      const userActivationsResponse = await supabase
+        .from('activationstable')
+        .select('*')
+        .eq('user', user.sicil_no);
+
+      const userActivations = userActivationsResponse.data || [];
+      const now = new Date();
+      const last24Hours = new Date(now - 24 * 60 * 60 * 1000);
+      const last7Days = new Date(now - 7 * 24 * 60 * 60 * 1000);
+      const last30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+      userStats[user.sicil_no] = {
+        fullName: user.full_name,
+        total: userActivations.length,
+        last24Hours: userActivations.filter(a => new Date(a.created_at) >= last24Hours).length,
+        last7Days: userActivations.filter(a => new Date(a.created_at) >= last7Days).length,
+        last30Days: userActivations.filter(a => new Date(a.created_at) >= last30Days).length
+      };
+    }
+
+    // En aktif kullanıcıları belirle
+    const topUsers = Object.entries(userStats)
+      .sort((a, b) => b[1].total - a[1].total)
+      .reduce((acc, [id, stats]) => {
+        acc[stats.fullName] = stats.total;
+        return acc;
+      }, {});
+
+    // Kullanıcı bilgilerini çek
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', Object.keys(userStats));
+
+    if (usersError) throw usersError;
+
+    // Kullanıcı bilgilerini map'le
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.sicil_no] = user.full_name;
+      return acc;
+    }, {});
+
+    // Kullanıcı istatistiklerini isimlerle birleştir
+    const userStatsWithNames = Object.entries(userStats).reduce((acc, [user, stats]) => {
+      acc[user] = {
+        ...stats,
+        fullName: userMap[user] || 'Bilinmeyen Kullanıcı'
+      };
+      return acc;
+    }, {});
+
+    // Status bazlı istatistikler
+    const statusStats = activationStats.reduce((acc, curr) => {
+      acc[curr.status] = (acc[curr.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Saatlik aktivasyon dağılımı
+    const hourlyStats = activationStats.reduce((acc, curr) => {
+      const hour = new Date(curr.created_at).getHours();
+      acc[hour] = (acc[hour] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Günlük aktivasyon trendi (son 30 gün)
+    const dailyStats = activationStats.reduce((acc, curr) => {
+      const date = new Date(curr.created_at).toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Son 30 günün günlük aktivasyon sayıları
+    const last30DaysStats = {};
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(now - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      last30DaysStats[date] = dailyStats[date] || 0;
+    }
+
+    // Ortalama günlük aktivasyon sayısı
+    const avgDailyActivations = Object.values(dailyStats).reduce((a, b) => a + b, 0) / Object.keys(dailyStats).length || 0;
+
+    // En yoğun kullanım saati
+    const peakHour = Object.entries(hourlyStats)
+      .sort(([, a], [, b]) => b - a)[0] || [0, 0];
 
     res.json({
+      general: {
+        totalIccids: totalIccids.count,
+        stockDistribution: stockStats
+      },
       activations: {
-        total: totalActivations,
-        types: activationTypes,
+        total: activationStats.length,
+        byType: activationTypeStats,
+        byTariff: tariffStats,
+        byStatus: statusStats,
+        timeBased: timeBasedStats
       },
-      iccids: {
-        total: totalIccids,
-        stock: iccidStock
+      users: {
+        total: Object.keys(userStats).length,
+        topUsers: topUsers,
+        detailedStats: userStatsWithNames
       },
-      mernis: {
-        total: totalMernis,
-        types: mernisTypes
+      trends: {
+        hourlyDistribution: hourlyStats,
+        dailyTrend: last30DaysStats,
+        averageDailyActivations: avgDailyActivations,
+        peakHour: {
+          hour: peakHour[0],
+          count: peakHour[1]
+        }
       }
     });
+
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
-
 
 module.exports = {
   getIccid,
