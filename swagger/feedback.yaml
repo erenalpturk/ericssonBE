@@ -1,0 +1,507 @@
+paths:
+  /feedback/user/feedbacks:
+    post:
+      tags:
+        - Feedback
+      summary: Kullanıcının feedback'lerini getir
+      description: Giriş yapmış kullanıcının tüm feedback'lerini listeler
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sicil_no:
+                  type: string
+      responses:
+        200:
+          description: Başarılı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Feedback'
+                  count:
+                    type: integer
+        500:
+          description: Sunucu hatası
+
+  /feedback/create:
+    post:
+      tags:
+        - Feedback
+      summary: Yeni feedback oluştur
+      description: Kullanıcı tarafından yeni hata bildirimi veya öneri gönderir
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedbackRequest'
+      responses:
+        201:
+          description: Feedback başarıyla oluşturuldu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Feedback'
+        400:
+          description: Geçersiz istek
+        500:
+          description: Sunucu hatası
+
+  /feedback/response:
+    post:
+      tags:
+        - Feedback
+      summary: Feedback'e yanıt ekle
+      description: Bir feedback'e kullanıcı veya admin yanıtı ekler
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                feedback_id:
+                  type: integer
+                user_sicil_no:
+                  type: string
+                user_name:
+                  type: string
+                message:
+                  type: string
+                is_admin:
+                  type: boolean
+                  default: false
+              required:
+                - feedback_id
+                - user_sicil_no
+                - message
+      responses:
+        201:
+          description: Yanıt başarıyla eklendi
+        400:
+          description: Geçersiz istek
+        500:
+          description: Sunucu hatası
+
+  /feedback/user/stats:
+    post:
+      tags:
+        - Feedback
+      summary: Kullanıcı istatistikleri
+      description: Kullanıcının feedback istatistiklerini getirir
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sicil_no:
+                  type: string
+              required:
+                - sicil_no
+      responses:
+        200:
+          description: Başarılı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/UserStats'
+
+  /feedback/detail/{id}:
+    get:
+      tags:
+        - Feedback
+      summary: Feedback detayını getir
+      description: Belirtilen ID'ye sahip feedback'in detaylarını getirir
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Feedback ID
+      responses:
+        200:
+          description: Başarılı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/FeedbackDetail'
+        404:
+          description: Feedback bulunamadı
+        500:
+          description: Sunucu hatası
+
+  /feedback/admin/all:
+    get:
+      tags:
+        - Admin Feedback
+      summary: Tüm feedback'leri getir (Admin)
+      description: Admin için tüm feedback'leri listeler
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [beklemede, inceleniyor, cozuldu, eklendi, reddedildi]
+          description: Durum filtresi
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [hata, oneri]
+          description: Tip filtresi
+        - in: query
+          name: priority
+          schema:
+            type: string
+            enum: [dusuk, orta, yuksek, kritik]
+          description: Öncelik filtresi
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Arama terimi
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Sayfa numarası
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+          description: Sayfa başına öğe sayısı
+      responses:
+        200:
+          description: Başarılı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Feedback'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /feedback/admin/update/{id}:
+    put:
+      tags:
+        - Admin Feedback
+      summary: Feedback'i güncelle (Admin)
+      description: Admin feedback durumunu ve diğer alanları günceller
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Feedback ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [beklemede, inceleniyor, cozuldu, eklendi, reddedildi]
+                admin_notes:
+                  type: string
+                admin_response:
+                  type: string
+                assigned_to:
+                  type: string
+                priority:
+                  type: string
+                  enum: [dusuk, orta, yuksek, kritik]
+      responses:
+        200:
+          description: Feedback başarıyla güncellendi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Feedback'
+        404:
+          description: Feedback bulunamadı
+        500:
+          description: Sunucu hatası
+
+  /feedback/admin/dashboard:
+    get:
+      tags:
+        - Admin Feedback
+      summary: Dashboard istatistikleri (Admin)
+      description: Admin dashboard için feedback istatistiklerini getirir
+      responses:
+        200:
+          description: Başarılı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      stats:
+                        $ref: '#/components/schemas/DashboardStats'
+                      trend:
+                        type: object
+                        description: Son 7 günün günlük trend verileri
+
+components:
+  schemas:
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_sicil_no:
+          type: string
+        user_name:
+          type: string
+        user_email:
+          type: string
+        type:
+          type: string
+          enum: [hata, oneri]
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [beklemede, inceleniyor, cozuldu, eklendi, reddedildi]
+        priority:
+          type: string
+          enum: [dusuk, orta, yuksek, kritik]
+        category:
+          type: string
+        module_name:
+          type: string
+        browser_info:
+          type: string
+        screenshot_url:
+          type: string
+        steps_to_reproduce:
+          type: string
+        expected_result:
+          type: string
+        actual_result:
+          type: string
+        admin_notes:
+          type: string
+        admin_response:
+          type: string
+        assigned_to:
+          type: string
+        resolved_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateFeedbackRequest:
+      type: object
+      required:
+        - user_sicil_no
+        - title
+        - description
+        - type
+      properties:
+        user_sicil_no:
+          type: string
+        user_name:
+          type: string
+        user_email:
+          type: string
+        type:
+          type: string
+          enum: [hata, oneri]
+        title:
+          type: string
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [dusuk, orta, yuksek, kritik]
+          default: orta
+        category:
+          type: string
+        module_name:
+          type: string
+        browser_info:
+          type: string
+        steps_to_reproduce:
+          type: string
+        expected_result:
+          type: string
+        actual_result:
+          type: string
+
+    FeedbackDetail:
+      allOf:
+        - $ref: '#/components/schemas/Feedback'
+        - type: object
+          properties:
+            feedback_responses:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeedbackResponse'
+            feedback_attachments:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeedbackAttachment'
+
+    FeedbackResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        feedback_id:
+          type: integer
+        user_sicil_no:
+          type: string
+        user_name:
+          type: string
+        message:
+          type: string
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    FeedbackAttachment:
+      type: object
+      properties:
+        id:
+          type: integer
+        feedback_id:
+          type: integer
+        file_name:
+          type: string
+        file_url:
+          type: string
+        file_type:
+          type: string
+        file_size:
+          type: integer
+        uploaded_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    UserStats:
+      type: object
+      properties:
+        user_sicil_no:
+          type: string
+        user_name:
+          type: string
+        total_feedbacks:
+          type: integer
+        total_bugs:
+          type: integer
+        total_suggestions:
+          type: integer
+        pending_count:
+          type: integer
+        resolved_count:
+          type: integer
+        implemented_count:
+          type: integer
+        last_feedback_date:
+          type: string
+          format: date-time
+
+    DashboardStats:
+      type: object
+      properties:
+        total_feedbacks:
+          type: integer
+        total_bugs:
+          type: integer
+        total_suggestions:
+          type: integer
+        pending_count:
+          type: integer
+        reviewing_count:
+          type: integer
+        resolved_count:
+          type: integer
+        implemented_count:
+          type: integer
+        rejected_count:
+          type: integer
+        critical_count:
+          type: integer
+        high_priority_count:
+          type: integer
+        this_week_count:
+          type: integer
+        this_month_count:
+          type: integer
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer 
