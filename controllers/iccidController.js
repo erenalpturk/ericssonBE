@@ -176,14 +176,13 @@ const getAll = async (req, res) => {
 };
 
 const addActivation = async (req, res) => {
-  const { msisdn, tckn, birth_date, activationtype, user, iccid, prod_ofr_id } = req.body;
-  console.log(req.body);
-  if (!msisdn || !tckn || !birth_date || !activationtype) {
+  const { msisdn, tckn, birth_date, activationtype, user, iccid, prod_ofr_id, isAutomation } = req.body;
+  if (!msisdn || !activationtype || !prod_ofr_id || !user) {
     return res.status(400).json({
-      error: `${!msisdn ? 'msisdn' : !tckn ? 'tckn' : !birth_date ? 'birth_date' : 'activationType'} alanı doldurulmadı`
+      error: `${!msisdn ? 'msisdn' : !activationtype ? 'activationType' : !prod_ofr_id ? 'prod_ofr_id' : !user ? 'user' : ''} alanı doldurulmadı`
     });
   }
-
+  const isAutomationValue = isAutomation === 0 ? 0 : 1;
   try {
     const { error } = await supabase
       .from('activationstable')
@@ -196,7 +195,8 @@ const addActivation = async (req, res) => {
         created_at: new Date().toISOString(),
         iccid,
         prod_ofr_id,
-        status: 'clean'
+        status: 'clean',
+        isAutomation: isAutomationValue
       }]);
 
     if (error) throw error;
