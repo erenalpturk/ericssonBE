@@ -457,198 +457,78 @@ const resetIccid = async (req, res) => {
 
 const getStats = async (req, res) => {
   try {
-    // Genel İstatistikler
-    const { data: totalIccids, error: totalError } = await supabase
-      .from('iccidTable')
-      .select('stock', { count: 'exact' });
-
-    if (totalError) throw totalError;
-
-    // Stok durumuna göre ICCID sayıları
-    const { data: stockStats, error: stockError } = await supabase
-      .from('iccidTable')
-      .select('stock')
-      .then(result => {
-        const stats = {
-          available: 0,
-          sold: 0,
-          reserved: 0
-        };
-        result.data.forEach(item => {
-          stats[item.stock] = (stats[item.stock] || 0) + 1;
-        });
-        return { data: stats, error: null };
-      });
-
-    if (stockError) throw stockError;
-
-    // Aktivasyon İstatistikleri
-    const { data: activationStats, error: activationError } = await supabase
+    // 1) Tüm gerekli alanları ve toplam sayıyı tek seferde çek
+    const { data, count: totalActivations, error } = await supabase
       .from('activationstable')
-      .select('*');
+      .select('user, created_at, activationtype, status, prod_ofr_id', { count: 'exact' });
+    if (error) throw error;
 
-    if (activationError) throw activationError;
+    // 2) Mevcut metrik objeleri
+    const activationsByUser     = {};
+    const activationsByDay      = {};
+    const activationsByType     = {};
+    const activationsByStatus   = {};
+    const activationsByProduct  = {};
+    const activationsByUserDay  = {};
+    const activationsByProdType = {};  // <-- yeni ek
 
-    // Aktivasyon tiplerine göre dağılım
-    const activationTypeStats = activationStats.reduce((acc, curr) => {
-      acc[curr.activationtype] = (acc[curr.activationtype] || 0) + 1;
-      return acc;
-    }, {});
+    // 3) Döngüde tüm sayımları yap
+    data.forEach(({ user, created_at, activationtype, status, prod_ofr_id }) => {
+      const day = new Date(created_at).toISOString().slice(0,10);
 
-    // Tarifelere göre dağılım
-    const { data: tariffData, error: tariffError } = await supabase
-      .from('gnl_parm')
-      .select('id, value');
+      // kullanıcı bazlı
+      activationsByUser[user] = (activationsByUser[user] || 0) + 1;
+      // gün bazlı
+      activationsByDay[day] = (activationsByDay[day] || 0) + 1;
+      // tip bazlı
+      activationsByType[activationtype] = (activationsByType[activationtype] || 0) + 1;
+      // durum bazlı
+      activationsByStatus[status] = (activationsByStatus[status] || 0) + 1;
+      // ürün bazlı
+      activationsByProduct[prod_ofr_id] = (activationsByProduct[prod_ofr_id] || 0) + 1;
+      // gün–kullanıcı kırılımı
+      activationsByUserDay[day] = activationsByUserDay[day] || {};
+      activationsByUserDay[day][user] = (activationsByUserDay[day][user] || 0) + 1;
 
-    if (tariffError) throw tariffError;
+      // ürün×tip bazlı: önce obje hiyerarşisini kur
+      activationsByProdType[prod_ofr_id] = activationsByProdType[prod_ofr_id] || {};
+      const bucket = activationsByProdType[prod_ofr_id];
 
-    const tariffMap = tariffData.reduce((acc, curr) => {
-      acc[curr.id] = curr.value;
-      return acc;
-    }, {});
-
-    const tariffStats = activationStats.reduce((acc, curr) => {
-      acc[tariffMap[curr.prod_ofr_id] || 'Bilinmeyen Tarife'] = (acc[tariffMap[curr.prod_ofr_id] || 'Bilinmeyen Tarife'] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Zaman bazlı istatistikler
-    const now = new Date();
-    const last24Hours = new Date(now - 24 * 60 * 60 * 1000);
-    const last7Days = new Date(now - 7 * 24 * 60 * 60 * 1000);
-    const last30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-    const timeBasedStats = {
-      last24Hours: activationStats.filter(a => new Date(a.created_at) > last24Hours).length,
-      last7Days: activationStats.filter(a => new Date(a.created_at) > last7Days).length,
-      last30Days: activationStats.filter(a => new Date(a.created_at) > last30Days).length
-    };
-
-    // Kullanıcı bazlı detaylı istatistikler
-    const userStats = {};
-    const users = await supabase
-      .from('users')
-      .select('*');
-    
-    for (const user of users.data) {
-      const userActivationsResponse = await supabase
-        .from('activationstable')
-        .select('*')
-        .eq('user', user.sicil_no);
-
-      const userActivations = userActivationsResponse.data || [];
-      const now = new Date();
-      const last24Hours = new Date(now - 24 * 60 * 60 * 1000);
-      const last7Days = new Date(now - 7 * 24 * 60 * 60 * 1000);
-      const last30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-      userStats[user.sicil_no] = {
-        fullName: user.full_name,
-        total: userActivations.length,
-        last24Hours: userActivations.filter(a => new Date(a.created_at) >= last24Hours).length,
-        last7Days: userActivations.filter(a => new Date(a.created_at) >= last7Days).length,
-        last30Days: userActivations.filter(a => new Date(a.created_at) >= last30Days).length
-      };
-    }
-
-    // En aktif kullanıcıları belirle
-    const topUsers = Object.entries(userStats)
-      .sort((a, b) => b[1].total - a[1].total)
-      .reduce((acc, [id, stats]) => {
-        acc[stats.fullName] = stats.total;
-        return acc;
-      }, {});
-
-    // Kullanıcı bilgilerini çek
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('sicil_no, full_name')
-      .in('sicil_no', Object.keys(userStats));
-
-    if (usersError) throw usersError;
-
-    // Kullanıcı bilgilerini map'le
-    const userMap = usersData.reduce((acc, user) => {
-      acc[user.sicil_no] = user.full_name;
-      return acc;
-    }, {});
-
-    // Kullanıcı istatistiklerini isimlerle birleştir
-    const userStatsWithNames = Object.entries(userStats).reduce((acc, [user, stats]) => {
-      acc[user] = {
-        ...stats,
-        fullName: userMap[user] || 'Bilinmeyen Kullanıcı'
-      };
-      return acc;
-    }, {});
-
-    // Status bazlı istatistikler
-    const statusStats = activationStats.reduce((acc, curr) => {
-      acc[curr.status] = (acc[curr.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Saatlik aktivasyon dağılımı
-    const hourlyStats = activationStats.reduce((acc, curr) => {
-      const hour = new Date(curr.created_at).getHours();
-      acc[hour] = (acc[hour] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Günlük aktivasyon trendi (son 30 gün)
-    const dailyStats = activationStats.reduce((acc, curr) => {
-      const date = new Date(curr.created_at).toISOString().split('T')[0];
-      acc[date] = (acc[date] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Son 30 günün günlük aktivasyon sayıları
-    const last30DaysStats = {};
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(now - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      last30DaysStats[date] = dailyStats[date] || 0;
-    }
-
-    // Ortalama günlük aktivasyon sayısı
-    const avgDailyActivations = Object.values(dailyStats).reduce((a, b) => a + b, 0) / Object.keys(dailyStats).length || 0;
-
-    // En yoğun kullanım saati
-    const peakHour = Object.entries(hourlyStats)
-      .sort(([, a], [, b]) => b - a)[0] || [0, 0];
-
-    res.json({
-      general: {
-        totalIccids: totalIccids.count,
-        stockDistribution: stockStats
-      },
-      activations: {
-        total: activationStats.length,
-        byType: activationTypeStats,
-        byTariff: tariffStats,
-        byStatus: statusStats,
-        timeBased: timeBasedStats
-      },
-      users: {
-        total: Object.keys(userStats).length,
-        topUsers: topUsers,
-        detailedStats: userStatsWithNames
-      },
-      trends: {
-        hourlyDistribution: hourlyStats,
-        dailyTrend: last30DaysStats,
-        averageDailyActivations: avgDailyActivations,
-        peakHour: {
-          hour: peakHour[0],
-          count: peakHour[1]
-        }
-      }
+      bucket[activationtype] = bucket[activationtype] || { count: 0, users: new Set() };
+      bucket[activationtype].count++;
+      bucket[activationtype].users.add(user);
     });
 
+    // 4) Set’leri array’e çevir
+    Object.values(activationsByProdType).forEach(typeMap => {
+      Object.values(typeMap).forEach(entry => {
+        entry.users = Array.from(entry.users);
+      });
+    });
+
+    // 5) Ortalama gibi diğer metrikleri de eklemek istersen buraya…
+
+    // 6) Sonuçları dön
+    res.json({
+      totalActivations,
+      activations: {
+        byUser:       activationsByUser,
+        byDay:        activationsByDay,
+        byType:       activationsByType,
+        byStatus:     activationsByStatus,
+        byProduct:    activationsByProduct,
+        byUserDay:    activationsByUserDay,
+        byProdType:   activationsByProdType
+      }
+    });
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Error in getStats:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
+
 
 module.exports = {
   getIccid,
