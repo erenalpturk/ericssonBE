@@ -16,6 +16,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const iccidRoutes = require('./routes/iccidRoutes');
 const userRoutes = require('./routes/userRoutes');
 const mernisRoutes = require('./routes/mernisRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 // const oracleRoutes = require('./routes/oracleRoutes');
 
 // Middleware
@@ -28,6 +29,7 @@ app.use(express.text()); // For text body parsing
 app.use('/iccid', iccidRoutes);
 app.use('/mernis', mernisRoutes);
 app.use('/user', userRoutes);
+app.use('/api/feedback', feedbackRoutes);
 // app.use('/oracle', oracleRoutes);
 
 // Swagger yapılandırması
@@ -35,6 +37,7 @@ const swaggerDocument = YAML.load(path.join(__dirname, 'swagger/index.yaml'));
 const iccidSpec = YAML.load(path.join(__dirname, 'swagger/iccid.yaml'));
 const mernisSpec = YAML.load(path.join(__dirname, 'swagger/mernis.yaml'));
 const userSpec = YAML.load(path.join(__dirname, 'swagger/user.yaml'));
+const feedbackSpec = YAML.load(path.join(__dirname, 'swagger/feedback.yaml'));
 // const oracleSpec = YAML.load(path.join(__dirname, 'swagger/oracle.yaml'));
 
 // Tüm spesifikasyonları birleştir
@@ -43,6 +46,7 @@ swaggerDocument.paths = {
   ...iccidSpec.paths,
   ...mernisSpec.paths,
   ...userSpec.paths,
+  ...feedbackSpec.paths,
   // ...oracleSpec.paths
 };
 
