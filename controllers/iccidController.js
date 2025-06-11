@@ -457,58 +457,85 @@ const resetIccid = async (req, res) => {
 
 const getStats = async (req, res) => {
   try {
-    // 1) Tüm gerekli alanları ve toplam sayıyı tek seferde çek
+    // 1) Tüm aktivasyon kayıtlarını ve toplam sayıyı çek
     const { data, count: totalActivations, error } = await supabase
       .from('activationstable')
       .select('user, created_at, activationtype, status, prod_ofr_id', { count: 'exact' });
     if (error) throw error;
 
-    // 2) Mevcut metrik objeleri
+    // 2) Benzersiz kullanıcı ID'lerini al
+    const userIds = Array.from(new Set(data.map(r => r.user)));
+
+    // 3) users tablosundan sicil_no -> full_name eşlemesi yap
+    const { data: usersInfo, error: errUsers } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', userIds);
+    if (errUsers) throw errUsers;
+    const nameMap = Object.fromEntries(usersInfo.map(u => [u.sicil_no, u.full_name]));
+
+    // 4) Gruplama objelerini hazırla
     const activationsByUser     = {};
     const activationsByDay      = {};
     const activationsByType     = {};
     const activationsByStatus   = {};
     const activationsByProduct  = {};
     const activationsByUserDay  = {};
-    const activationsByProdType = {};  // <-- yeni ek
+    const activationsByProdType = {};
 
-    // 3) Döngüde tüm sayımları yap
-    data.forEach(({ user, created_at, activationtype, status, prod_ofr_id }) => {
-      const day = new Date(created_at).toISOString().slice(0,10);
+    // 5) Tek döngüyle tüm sayımları yap, user yerine full_name kullan
+    data.forEach(record => {
+      const {
+        user: userId,
+        created_at,
+        activationtype,
+        status,
+        prod_ofr_id
+      } = record;
 
-      // kullanıcı bazlı
-      activationsByUser[user] = (activationsByUser[user] || 0) + 1;
-      // gün bazlı
+      const fullName = nameMap[userId] || 'Bilinmeyen Kullanıcı';
+      const day      = new Date(created_at).toISOString().slice(0,10);
+
+      // byUser
+      activationsByUser[fullName] = (activationsByUser[fullName] || 0) + 1;
+
+      // byDay
       activationsByDay[day] = (activationsByDay[day] || 0) + 1;
-      // tip bazlı
-      activationsByType[activationtype] = (activationsByType[activationtype] || 0) + 1;
-      // durum bazlı
-      activationsByStatus[status] = (activationsByStatus[status] || 0) + 1;
-      // ürün bazlı
-      activationsByProduct[prod_ofr_id] = (activationsByProduct[prod_ofr_id] || 0) + 1;
-      // gün–kullanıcı kırılımı
-      activationsByUserDay[day] = activationsByUserDay[day] || {};
-      activationsByUserDay[day][user] = (activationsByUserDay[day][user] || 0) + 1;
 
-      // ürün×tip bazlı: önce obje hiyerarşisini kur
-      activationsByProdType[prod_ofr_id] = activationsByProdType[prod_ofr_id] || {};
+      // byType
+      activationsByType[activationtype] = (activationsByType[activationtype] || 0) + 1;
+
+      // byStatus
+      activationsByStatus[status] = (activationsByStatus[status] || 0) + 1;
+
+      // byProduct
+      activationsByProduct[prod_ofr_id] = (activationsByProduct[prod_ofr_id] || 0) + 1;
+
+      // byUserDay
+      if (!activationsByUserDay[day]) activationsByUserDay[day] = {};
+      activationsByUserDay[day][fullName] =
+        (activationsByUserDay[day][fullName] || 0) + 1;
+
+      // byProdType: ürün × tip × {count, users}
+      if (!activationsByProdType[prod_ofr_id]) activationsByProdType[prod_ofr_id] = {};
       const bucket = activationsByProdType[prod_ofr_id];
 
-      bucket[activationtype] = bucket[activationtype] || { count: 0, users: new Set() };
+      if (!bucket[activationtype]) {
+        bucket[activationtype] = { count: 0, users: new Set() };
+      }
       bucket[activationtype].count++;
-      bucket[activationtype].users.add(user);
+      bucket[activationtype].users.add(fullName);
     });
 
-    // 4) Set’leri array’e çevir
-    Object.values(activationsByProdType).forEach(typeMap => {
-      Object.values(typeMap).forEach(entry => {
-        entry.users = Array.from(entry.users);
-      });
-    });
+    // 6) Set’leri array’e çevir
+    for (const prodId in activationsByProdType) {
+      for (const type in activationsByProdType[prodId]) {
+        activationsByProdType[prodId][type].users =
+          Array.from(activationsByProdType[prodId][type].users);
+      }
+    }
 
-    // 5) Ortalama gibi diğer metrikleri de eklemek istersen buraya…
-
-    // 6) Sonuçları dön
+    // 7) Yanıtı dön
     res.json({
       totalActivations,
       activations: {
