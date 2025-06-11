@@ -4,6 +4,46 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Bildirim gönderme fonksiyonu
+const sendNotification = async (userSicilNo, title, message) => {
+    try {
+        const { error } = await supabase
+            .from('notifications')
+            .insert([{
+                user_sicil_no: userSicilNo,
+                title,
+                message,
+                cdate: new Date().toISOString(),
+                statu: 'UNREAD'
+            }]);
+
+        if (error) {
+            console.error('Bildirim gönderilirken hata:', error);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Bildirim gönderilirken hata:', error);
+        return false;
+    }
+};
+
+// Admin kullanıcılarını getir
+const getAdminUsers = async () => {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('sicil_no, full_name')
+            .eq('role', 'admin');
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error('Admin kullanıcıları getirilirken hata:', error);
+        return [];
+    }
+};
+
 // Tüm feedback'leri getir (kullanıcı sadece kendi feedback'lerini görür)
 const getUserFeedbacks = async (req, res) => {
     try {
@@ -96,6 +136,16 @@ const createFeedback = async (req, res) => {
 
         if (error) throw error;
 
+        // Admin'lere bildirim gönder
+        const adminUsers = await getAdminUsers();
+        for (const admin of adminUsers) {
+            await sendNotification(
+                admin.sicil_no,
+                `Yeni ${type === 'hata' ? 'Hata Bildirimi' : 'Öneri'}`,
+                `${user_name || user_sicil_no} tarafından yeni bir ${type === 'hata' ? 'hata bildirimi' : 'öneri'} gönderildi: "${title}"`
+            );
+        }
+
         res.status(201).json({
             success: true,
             message: 'Feedback başarıyla oluşturuldu',
@@ -140,6 +190,27 @@ const addFeedbackResponse = async (req, res) => {
             .select();
 
         if (error) throw error;
+
+        // Feedback sahibine bildirim gönder (admin yanıtı ise)
+        if (is_admin && feedback_id) {
+            try {
+                const { data: feedbackData, error: feedbackError } = await supabase
+                    .from('feedbacks')
+                    .select('user_sicil_no, title, user_name')
+                    .eq('id', feedback_id)
+                    .single();
+
+                if (!feedbackError && feedbackData && feedbackData.user_sicil_no !== user_sicil_no) {
+                    await sendNotification(
+                        feedbackData.user_sicil_no,
+                        '💬 Feedback\'inize Yanıt Geldi',
+                        `"${feedbackData.title}" başlıklı feedback'iniz için ${user_name || 'Admin'} tarafından yeni bir yanıt eklendi: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`
+                    );
+                }
+            } catch (notificationError) {
+                console.error('Yanıt bildirimi gönderilirken hata:', notificationError);
+            }
+        }
 
         res.status(201).json({
             success: true,
@@ -262,6 +333,33 @@ const updateFeedbackStatus = async (req, res) => {
                 success: false,
                 error: 'Feedback bulunamadı'
             });
+        }
+
+        // Kullanıcıya bildirim gönder (durum değişikliği varsa)
+        if (status && data[0].user_sicil_no) {
+            const statusMessages = {
+                'beklemede': 'Feedback\'iniz inceleme bekliyor',
+                'inceleniyor': 'Feedback\'iniz incelemeye alındı',
+                'cozuldu': 'Feedback\'iniz çözüldü olarak işaretlendi',
+                'eklendi': 'Öneriniz eklendi olarak işaretlendi',
+                'reddedildi': 'Feedback\'iniz reddedildi'
+            };
+
+            const statusEmojis = {
+                'beklemede': '⏳',
+                'inceleniyor': '🔍',
+                'cozuldu': '✅',
+                'eklendi': '🎉',
+                'reddedildi': '❌'
+            };
+
+            if (statusMessages[status]) {
+                await sendNotification(
+                    data[0].user_sicil_no,
+                    `${statusEmojis[status]} Feedback Durumu Güncellendi`,
+                    `"${data[0].title}" başlıklı feedback'iniz için durum güncellendi: ${statusMessages[status]}${admin_response ? `\n\nAdmin Yanıtı: ${admin_response}` : ''}`
+                );
+            }
         }
 
         res.status(200).json({
