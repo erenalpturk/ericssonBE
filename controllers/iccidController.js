@@ -455,7 +455,8 @@ const formatAndInsertIccids = async (req, res) => {
       iccid: iccid,
       stock: 'available',
       type: type,
-      added_by: sicil_no
+      added_by: sicil_no,
+      used_by: sicil_no
     }));
 
     const { error } = await supabase
