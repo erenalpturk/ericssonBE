@@ -126,6 +126,22 @@ const getUserNotifications = async (req, res) => {
     }
 };
 
+const getAllUsers = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('sicil_no, full_name, role')
+            .order('full_name', { ascending: true });
+
+        if (error) throw error;
+
+        res.status(200).json({ data });
+    } catch (err) {
+        console.error("Hata:", err);
+        res.status(500).json({ error: "Sunucu hatası" });
+    }
+};
+
 const updateNotificationStatus = async (req, res) => {
     const { id, user_sicil_no } = req.params;
     const { statu } = req.body;
@@ -162,5 +178,6 @@ module.exports = {
     getUser,
     createNotification,
     getUserNotifications,
-    updateNotificationStatus
+    updateNotificationStatus,
+    getAllUsers
 };

@@ -22,6 +22,10 @@ router.post("/enesvealpdatalarinizigetiriyoru", iccidController.getActivationsPu
 router.post("/enesvealpdatalarinizigetiriyor/:user", iccidController.getActivations);
 router.post("/update-activation", iccidController.updateActivation);
 
+// Transfer Routes
+router.post("/transfer-activation", iccidController.transferActivation);
+router.get("/transfer-history/:activationId", iccidController.getTransferHistory);
+
 // ICCID Format and Import Routes
 router.post("/formatAndInsertIccids/:type/:sicil_no", iccidController.formatAndInsertIccids);
 

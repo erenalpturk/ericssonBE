@@ -211,11 +211,11 @@ const addActivation = async (req, res) => {
 const getActivations = async (req, res) => {
   const { user } = req.params;
   try {
-    // Önce aktivasyonları çek
+    // Önce aktivasyonları çek - hem kendi dataları hem de transfer edilenler
     const { data: activationsData, error: activationsError } = await supabase
       .from('activationstable')
       .select('*')
-      .eq('user', user)
+      .or(`user.eq.${user},transfer_user->>current_user.eq.${user}`)
       .order('created_at', { ascending: false });
 
     if (activationsError) throw activationsError;
@@ -224,13 +224,34 @@ const getActivations = async (req, res) => {
       return res.json({ message: "Data çıkmamışsın knk" });
     }
 
+    // Tüm kullanıcı sicil numaralarını topla (user + transfer_user'lardan)
+    const allUserSicils = new Set();
+    activationsData.forEach(a => {
+      allUserSicils.add(a.user);
+      if (a.transfer_user?.transfers) {
+        a.transfer_user.transfers.forEach(t => {
+          allUserSicils.add(t.from);
+          allUserSicils.add(t.to);
+        });
+      }
+      if (a.transfer_user?.original_user) allUserSicils.add(a.transfer_user.original_user);
+      if (a.transfer_user?.current_user) allUserSicils.add(a.transfer_user.current_user);
+    });
+
     // Kullanıcı bilgilerini çek
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select('sicil_no, full_name')
-      .in('sicil_no', activationsData.map(a => a.user));
+      .in('sicil_no', Array.from(allUserSicils));
 
     if (usersError) throw usersError;
+
+    // Debug: Eksik kullanıcıları logla
+    const foundUserSicils = usersData.map(u => u.sicil_no);
+    const missingUsers = Array.from(allUserSicils).filter(sicil => !foundUserSicils.includes(sicil));
+    if (missingUsers.length > 0) {
+      console.warn('⚠️ Kullanıcı tablosunda bulunamayan sicil numaraları:', missingUsers);
+    }
 
     // Tarife bilgilerini çek
     const { data: tariffData, error: tariffError } = await supabase
@@ -252,12 +273,28 @@ const getActivations = async (req, res) => {
       return acc;
     }, {});
 
-    // Verileri birleştir
-    const formattedData = activationsData.map(item => ({
-      ...item,
-      tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
-      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
-    }));
+    // Verileri birleştir - transfer durumunu kontrol et
+    const formattedData = activationsData.map(item => {
+      // Eğer transfer edilmişse, current_user'ı kullan
+      const currentUser = item.transfer_user?.current_user || item.user;
+      
+      return {
+        ...item,
+        tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
+        full_name: userMap[currentUser] || 'Bilinmeyen Kullanıcı',
+        current_owner: currentUser,
+        original_owner: item.transfer_user?.original_user || item.user,
+        original_owner_name: userMap[item.transfer_user?.original_user || item.user] || 'Bilinmeyen Kullanıcı',
+        transfer_user: item.transfer_user ? {
+          ...item.transfer_user,
+          transfers: item.transfer_user.transfers?.map(transfer => ({
+            ...transfer,
+            from_name: userMap[transfer.from] || transfer.from,
+            to_name: userMap[transfer.to] || transfer.to
+          })) || []
+        } : null
+      };
+    });
 
     res.json(formattedData);
 
@@ -281,12 +318,33 @@ const getActivationsPublic = async (req, res) => {
       return res.json({ message: "Datan kalmamış knk" });
     }
 
+    // Tüm kullanıcı sicil numaralarını topla (user + transfer_user'lardan)
+    const allUserSicils = new Set();
+    activationsData.forEach(a => {
+      allUserSicils.add(a.user);
+      if (a.transfer_user?.transfers) {
+        a.transfer_user.transfers.forEach(t => {
+          allUserSicils.add(t.from);
+          allUserSicils.add(t.to);
+        });
+      }
+      if (a.transfer_user?.original_user) allUserSicils.add(a.transfer_user.original_user);
+      if (a.transfer_user?.current_user) allUserSicils.add(a.transfer_user.current_user);
+    });
+
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select('sicil_no, full_name')
-      .in('sicil_no', activationsData.map(a => a.user));
+      .in('sicil_no', Array.from(allUserSicils));
 
     if (usersError) throw usersError;
+
+    // Debug: Eksik kullanıcıları logla (Public endpoint)
+    const foundUserSicils = usersData.map(u => u.sicil_no);
+    const missingUsers = Array.from(allUserSicils).filter(sicil => !foundUserSicils.includes(sicil));
+    if (missingUsers.length > 0) {
+      console.warn('⚠️ [Public] Kullanıcı tablosunda bulunamayan sicil numaraları:', missingUsers);
+    }
 
     // Tarife bilgilerini çek
     const { data: tariffData, error: tariffError } = await supabase
@@ -308,12 +366,28 @@ const getActivationsPublic = async (req, res) => {
       return acc;
     }, {});
 
-    // Verileri birleştir
-    const formattedData = activationsData.map(item => ({
-      ...item,
-      tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
-      full_name: userMap[item.user] || 'Bilinmeyen Kullanıcı'
-    }));
+    // Verileri birleştir - transfer durumunu kontrol et
+    const formattedData = activationsData.map(item => {
+      // Eğer transfer edilmişse, current_user'ı kullan
+      const currentUser = item.transfer_user?.current_user || item.user;
+      
+      return {
+        ...item,
+        tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
+        full_name: userMap[currentUser] || 'Bilinmeyen Kullanıcı',
+        current_owner: currentUser,
+        original_owner: item.transfer_user?.original_user || item.user,
+        original_owner_name: userMap[item.transfer_user?.original_user || item.user] || 'Bilinmeyen Kullanıcı',
+        transfer_user: item.transfer_user ? {
+          ...item.transfer_user,
+          transfers: item.transfer_user.transfers?.map(transfer => ({
+            ...transfer,
+            from_name: userMap[transfer.from] || transfer.from,
+            to_name: userMap[transfer.to] || transfer.to
+          })) || []
+        } : null
+      };
+    });
 
     res.json(formattedData);
   } catch (err) {
@@ -554,6 +628,204 @@ const getStats = async (req, res) => {
   }
 };
 
+// Transfer işlemi
+const transferActivation = async (req, res) => {
+  const { activationId, fromUser, toUser } = req.body;
+
+  if (!activationId || !fromUser || !toUser) {
+    return res.status(400).json({
+      error: "Aktivasyon ID, gönderen kullanıcı ve alıcı kullanıcı zorunludur"
+    });
+  }
+
+  if (fromUser === toUser) {
+    return res.status(400).json({
+      error: "Aynı kullanıcıya transfer yapamazsınız"
+    });
+  }
+
+  try {
+    // Önce aktivasyonu bul
+    const { data: activationData, error: findError } = await supabase
+      .from('activationstable')
+      .select('*')
+      .eq('activationid', activationId)
+      .single();
+
+    if (findError || !activationData) {
+      return res.status(404).json({
+        error: "Aktivasyon bulunamadı"
+      });
+    }
+
+    // Transfer yetkisini kontrol et
+    const currentOwner = activationData.transfer_user?.current_user || activationData.user;
+    if (currentOwner !== fromUser) {
+      return res.status(403).json({
+        error: "Bu aktivasyonu transfer etme yetkiniz yok"
+      });
+    }
+
+    // Alıcı kullanıcının varlığını kontrol et
+    const { data: toUserData, error: userError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .eq('sicil_no', toUser)
+      .single();
+
+    if (userError || !toUserData) {
+      return res.status(404).json({
+        error: "Alıcı kullanıcı bulunamadı"
+      });
+    }
+
+    // Transfer geçmişini hazırla
+    const currentTransfers = activationData.transfer_user?.transfers || [];
+    
+    // Önceki transferi pasif yap
+    const updatedTransfers = currentTransfers.map(transfer => ({
+      ...transfer,
+      active: false
+    }));
+
+    // Yeni transfer ekle
+    const newTransfer = {
+      from: fromUser,
+      to: toUser,
+      date: new Date().toISOString(),
+      active: true
+    };
+
+    updatedTransfers.push(newTransfer);
+
+    const transferData = {
+      transfers: updatedTransfers,
+      original_user: activationData.transfer_user?.original_user || activationData.user,
+      current_user: toUser
+    };
+
+    // Database'i güncelle
+    const { data, error: updateError } = await supabase
+      .from('activationstable')
+      .update({
+        transfer_user: transferData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('activationid', activationId)
+      .select();
+
+    if (updateError) throw updateError;
+
+    // Gönderen kullanıcının bilgilerini al
+    const { data: fromUserData, error: fromUserError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .eq('sicil_no', fromUser)
+      .single();
+
+    if (!fromUserError && fromUserData) {
+      // Alıcı kullanıcıya bildirim gönder
+      const notificationMessage = `${fromUserData.full_name} size bir data transfer etti. MSISDN: ${activationData.msisdn}`;
+      
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_sicil_no: toUser,
+          message: notificationMessage,
+          cdate: new Date().toISOString(),
+          statu: 'UNREAD'
+        });
+
+      if (notificationError) {
+        console.error('Bildirim gönderilirken hata:', notificationError);
+        // Bildirim hatası transfer işlemini etkilemesin
+      }
+    }
+
+    res.json({
+      message: `Aktivasyon ${toUserData.full_name} kullanıcısına başarıyla transfer edildi`,
+      data: data[0]
+    });
+
+  } catch (err) {
+    console.error("Transfer hatası:", err);
+    res.status(500).json({ error: "Transfer işlemi sırasında bir hata oluştu" });
+  }
+};
+
+// Transfer geçmişini getir
+const getTransferHistory = async (req, res) => {
+  const { activationId } = req.params;
+
+  if (!activationId) {
+    return res.status(400).json({
+      error: "Aktivasyon ID zorunludur"
+    });
+  }
+
+  try {
+    const { data: activationData, error } = await supabase
+      .from('activationstable')
+      .select('transfer_user, user, msisdn')
+      .eq('activationid', activationId)
+      .single();
+
+    if (error || !activationData) {
+      return res.status(404).json({
+        error: "Aktivasyon bulunamadı"
+      });
+    }
+
+    if (!activationData.transfer_user || !activationData.transfer_user.transfers) {
+      return res.json({
+        message: "Bu aktivasyon hiç transfer edilmemiş",
+        original_user: activationData.user,
+        current_user: activationData.user,
+        transfers: []
+      });
+    }
+
+    // Kullanıcı isimlerini al
+    const allUsers = [...new Set([
+      activationData.transfer_user.original_user,
+      activationData.transfer_user.current_user,
+      ...activationData.transfer_user.transfers.map(t => [t.from, t.to]).flat()
+    ])];
+
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('sicil_no, full_name')
+      .in('sicil_no', allUsers);
+
+    if (usersError) throw usersError;
+
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.sicil_no] = user.full_name;
+      return acc;
+    }, {});
+
+    // Transfer geçmişini formatla
+    const formattedTransfers = activationData.transfer_user.transfers.map(transfer => ({
+      ...transfer,
+      from_name: userMap[transfer.from] || 'Bilinmeyen Kullanıcı',
+      to_name: userMap[transfer.to] || 'Bilinmeyen Kullanıcı'
+    }));
+
+    res.json({
+      msisdn: activationData.msisdn,
+      original_user: activationData.transfer_user.original_user,
+      original_user_name: userMap[activationData.transfer_user.original_user] || 'Bilinmeyen Kullanıcı',
+      current_user: activationData.transfer_user.current_user,
+      current_user_name: userMap[activationData.transfer_user.current_user] || 'Bilinmeyen Kullanıcı',
+      transfers: formattedTransfers
+    });
+
+  } catch (err) {
+    console.error("Transfer geçmişi hatası:", err);
+    res.status(500).json({ error: "Transfer geçmişi alınırken bir hata oluştu" });
+  }
+};
+
 
 
 
@@ -570,5 +842,7 @@ module.exports = {
   updateIccid,
   getIccidByUserId,
   updateActivation,
-  getAll
+  getAll,
+  transferActivation,
+  getTransferHistory
 };
