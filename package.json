@@ -19,6 +19,7 @@
     "express": "^4.21.2",
     "install": "^0.13.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.1",
     "node-mailjet": "^3.3.2",
     "nodemailer": "^6.9.7",
     "npm": "^10.2.0",

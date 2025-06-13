@@ -1,8 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
-
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
 
 const getUser = async (req, res) => {
     const { sicil_no } = req.body;
@@ -42,64 +43,107 @@ const updatePassword = async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
-const createNotification = async (req, res) => {
-    const { user_sicil_no, message, title } = req.body;
-    if (!message || !title) {
-        return res.status(400).json({ error: "Mesaj ve başlık zorunludur" });
-    }
 
-    if (!user_sicil_no && user_sicil_no !== 'ALL') {
-        return res.status(400).json({ error: "Kullanıcı sicil no zorunludur veya herkese gönder seçeneğini işaretleyin" });
-    }
+const createNotification = async (req, res) => {
 
     try {
-        let notifications = [];
+        const { user_sicil_no, title, message } = req.body;
+        const file = req.file;  // multer yükledi
 
-        if (user_sicil_no === 'ALL') {
-            const { data: users, error: usersError } = await supabase
-                .from('users')
-                .select('sicil_no')
-                .not('role', 'eq', 'admin');
-                
-            if (usersError) throw usersError;
-            
-            if (!users || users.length === 0) {
-                return res.status(404).json({ error: "Bildirim gönderilecek kullanıcı bulunamadı" });
+        // 1️⃣ Validasyon
+        if (!title || !message) {
+            return res.status(400).json({ error: "Başlık ve mesaj zorunlu." });
+        }
+        if (!user_sicil_no && user_sicil_no !== "ALL") {
+            return res.status(400).json({
+                error: "user_sicil_no zorunlu, veya ALL olarak gönder."
+            });
+        }
+        // 2️⃣ Fotoğraf varsa Storage'a yükle
+        let imageUrl = null;
+        if (file) {
+
+            // unique dosya adı
+            const ext = path.extname(file.originalname);
+            const fileName = `${uuidv4()}${ext}`;
+            const filePath = `notification-photos/${fileName}`;
+
+            // upload
+            const { data: uploadData, error: uploadErr } =
+                await supabase
+                    .storage
+                    .from("notification-photos")
+                    .upload(filePath, file.buffer, {
+                        contentType: file.mimetype,
+                        upsert: false
+                    });
+
+            if (uploadErr) {
+                console.error("Upload HATASI:", uploadErr);
+                return res.status(500).json({ error: uploadErr });
             }
 
-            notifications = users.map(user => ({
-                user_sicil_no: user.sicil_no,
+            // public URL
+            const { data: publicUrlData, error: urlErr } = supabase
+                .storage
+                .from("notification-photos")
+                .getPublicUrl(filePath);
+
+            if (urlErr) throw urlErr;
+
+            imageUrl = publicUrlData?.publicUrl;
+        }
+        // 3️⃣ Bildirim objelerini hazırla
+        let notifications = [];
+        if (user_sicil_no === "ALL") {
+            const { data: users, error: usersErr } =
+                await supabase
+                    .from("users")
+                    .select("sicil_no")
+                    .not("role", "eq", "admin");
+            if (usersErr) throw usersErr;
+            if (!users.length) {
+                return res
+                    .status(404)
+                    .json({ error: "Bildirim gönderilecek kullanıcı bulunamadı." });
+            }
+            notifications = users.map(u => ({
+                user_sicil_no: u.sicil_no,
+                title,
                 message,
-                title, 
+                image_url: imageUrl,
                 cdate: new Date().toISOString(),
-                statu: 'UNREAD'
+                statu: "UNREAD"
             }));
         } else {
             notifications.push({
                 user_sicil_no,
-                message,
                 title,
+                message,
+                image_url: imageUrl,
                 cdate: new Date().toISOString(),
-                statu: 'UNREAD'
+                statu: "UNREAD"
             });
         }
 
-        const { data, error } = await supabase
-            .from('notifications')
+        // 4️⃣ Veritabanına kaydet
+        const { data, error: insertErr } = await supabase
+            .from("notifications")
             .insert(notifications)
             .select();
+        if (insertErr) throw insertErr;
 
-        if (error) throw error;
-
-        res.status(201).json({ 
-            message: user_sicil_no === 'ALL' 
-                ? `${notifications.length} kullanıcıya bildirim gönderildi` 
-                : "Bildirim başarıyla oluşturuldu", 
-            data 
+        // 5️⃣ Yanıt
+        res.status(201).json({
+            message:
+                user_sicil_no === "ALL"
+                    ? `${notifications.length} kullanıcıya bildirim gönderildi.`
+                    : "Bildirim başarıyla oluşturuldu.",
+            data
         });
     } catch (err) {
-        console.error("Hata:", err);
-        res.status(500).json({ error: "Sunucu hatası" });
+        console.error("createNotification error:", err);
+        res.status(500).json({ error: "Sunucu hatası." });
     }
 };
 
@@ -153,7 +197,7 @@ const updateNotificationStatus = async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('notifications')
-            .update({ 
+            .update({
                 statu: statu,
                 udate: new Date().toISOString()
             })
