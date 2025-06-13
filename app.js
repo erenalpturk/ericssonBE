@@ -19,6 +19,9 @@ const iccidRoutes = require('./routes/iccidRoutes');
 const userRoutes = require('./routes/userRoutes');
 const mernisRoutes = require('./routes/mernisRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
+const scriptsRoutes = require('./routes/scriptsRoutes');
+const projectsRoutes = require('./routes/projects');
+const contactsRoutes = require('./routes/contacts');
 // const oracleRoutes = require('./routes/oracleRoutes');
 
 // Middleware
@@ -32,6 +35,9 @@ app.use('/iccid', iccidRoutes);
 app.use('/mernis', mernisRoutes);
 app.use('/user', userRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/scripts', scriptsRoutes);
+app.use('/api/projects', projectsRoutes);
+app.use('/api/contacts', contactsRoutes);
 // app.use('/oracle', oracleRoutes);
 
 // Swagger yapılandırması
