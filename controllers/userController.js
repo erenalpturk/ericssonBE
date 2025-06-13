@@ -217,11 +217,187 @@ const updateNotificationStatus = async (req, res) => {
     }
 };
 
+// Bildirim geçmişini getir (Admin Panel için)
+const getNotifications = async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
+
+        // Tüm bildirimleri getir
+        const { data, error } = await supabase
+            .from('notifications')
+            .select(`
+                id,
+                user_sicil_no,
+                title,
+                message,
+                image_url,
+                statu,
+                cdate,
+                udate
+            `)
+            .order('cdate', { ascending: false })
+            .range(offset, offset + parseInt(limit) - 1);
+
+        if (error) throw error;
+
+        // Kullanıcı bilgilerini ekle
+        const usersResponse = await supabase
+            .from('users')
+            .select('sicil_no, full_name, role');
+
+        if (usersResponse.error) {
+            console.warn('Kullanıcı bilgileri alınamadı:', usersResponse.error);
+        }
+
+        const users = usersResponse.data || [];
+        
+        // Bildirimleri kullanıcı bilgileriyle birleştir
+        const enrichedData = data.map(notification => {
+            let receiver = "Bilinmeyen Kullanıcı";
+            
+            if (notification.user_sicil_no === "ALL") {
+                receiver = "Tüm Kullanıcılar";
+            } else {
+                const user = users.find(u => u.sicil_no.toString() === notification.user_sicil_no.toString());
+                if (user) {
+                    receiver = user.full_name;
+                } else {
+                    receiver = `Sicil No: ${notification.user_sicil_no}`;
+                }
+            }
+
+            return {
+                ...notification,
+                receiver,
+                sender: "Admin"
+            };
+        });
+
+        // Toplam sayıyı al
+        const { count: totalCount } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true });
+
+        res.status(200).json({ 
+            data: enrichedData, 
+            total: totalCount || data.length,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil((totalCount || data.length) / limit)
+        });
+
+    } catch (err) {
+        console.error("getNotifications error:", err);
+        res.status(500).json({ error: "Sunucu hatası" });
+    }
+};
+
+// Bildirim sil
+const deleteNotification = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({ error: "Bildirim ID zorunludur" });
+        }
+
+        // Önce bildirimi bul
+        const { data: notification, error: findError } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (findError || !notification) {
+            return res.status(404).json({ error: "Bildirim bulunamadı" });
+        }
+
+        // Eğer resim varsa storage'dan da sil
+        if (notification.image_url) {
+            try {
+                // URL'den dosya yolunu çıkar
+                const url = new URL(notification.image_url);
+                const pathParts = url.pathname.split('/');
+                const fileName = pathParts[pathParts.length - 1];
+                const filePath = `notification-photos/${fileName}`;
+
+                const { error: deleteStorageError } = await supabase
+                    .storage
+                    .from('notification-photos')
+                    .remove([filePath]);
+
+                if (deleteStorageError) {
+                    console.warn('Resim silinemedi:', deleteStorageError);
+                }
+            } catch (urlError) {
+                console.warn('Resim URL\'si parse edilemedi:', urlError);
+            }
+        }
+
+        // Bildirimi sil
+        const { error: deleteError } = await supabase
+            .from('notifications')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) throw deleteError;
+
+        res.status(200).json({ message: "Bildirim başarıyla silindi" });
+
+    } catch (err) {
+        console.error("deleteNotification error:", err);
+        res.status(500).json({ error: "Sunucu hatası" });
+    }
+};
+
+// Bildirim düzenle
+const updateNotification = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, message } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ error: "Bildirim ID zorunludur" });
+        }
+
+        if (!title || !message) {
+            return res.status(400).json({ error: "Başlık ve mesaj zorunludur" });
+        }
+
+        const { data, error } = await supabase
+            .from('notifications')
+            .update({
+                title,
+                message,
+                udate: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select();
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            return res.status(404).json({ error: "Bildirim bulunamadı" });
+        }
+
+        res.status(200).json({ 
+            message: "Bildirim başarıyla güncellendi", 
+            data: data[0] 
+        });
+
+    } catch (err) {
+        console.error("updateNotification error:", err);
+        res.status(500).json({ error: "Sunucu hatası" });
+    }
+};
+
 module.exports = {
     updatePassword,
     getUser,
     createNotification,
     getUserNotifications,
     updateNotificationStatus,
-    getAllUsers
+    getAllUsers,
+    getNotifications,
+    deleteNotification,
+    updateNotification
 };
