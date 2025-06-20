@@ -22,7 +22,8 @@ const feedbackRoutes = require('./routes/feedbackRoutes');
 const scriptsRoutes = require('./routes/scriptsRoutes');
 const projectsRoutes = require('./routes/projects');
 const contactsRoutes = require('./routes/contacts');
-// const oracleRoutes = require('./routes/oracleRoutes');
+const oracleRoutes = require('./routes/oracleRoutes');
+const courierTriggersRoutes = require('./routes/courierTriggersRoutes');
 
 // Middleware
 app.use(cors());
@@ -38,7 +39,8 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/scripts', scriptsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/contacts', contactsRoutes);
-// app.use('/oracle', oracleRoutes);
+app.use('/api/oracle', oracleRoutes);
+app.use('/api/courier-triggers', courierTriggersRoutes);
 
 // Swagger yapılandırması
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger/index.yaml'));
@@ -46,7 +48,7 @@ const iccidSpec = YAML.load(path.join(__dirname, 'swagger/iccid.yaml'));
 const mernisSpec = YAML.load(path.join(__dirname, 'swagger/mernis.yaml'));
 const userSpec = YAML.load(path.join(__dirname, 'swagger/user.yaml'));
 const feedbackSpec = YAML.load(path.join(__dirname, 'swagger/feedback.yaml'));
-// const oracleSpec = YAML.load(path.join(__dirname, 'swagger/oracle.yaml'));
+const oracleSpec = YAML.load(path.join(__dirname, 'swagger/oracle.yaml'));
 
 // Tüm spesifikasyonları birleştir
 swaggerDocument.paths = {
@@ -55,7 +57,7 @@ swaggerDocument.paths = {
   ...mernisSpec.paths,
   ...userSpec.paths,
   ...feedbackSpec.paths,
-  // ...oracleSpec.paths
+  ...oracleSpec.paths
 };
 
 swaggerDocument.components = {
@@ -65,7 +67,7 @@ swaggerDocument.components = {
     ...iccidSpec.components?.schemas,
     ...mernisSpec.components?.schemas,
     ...userSpec.components?.schemas,
-    // ...oracleSpec.components?.schemas
+    ...oracleSpec.components?.schemas
   }
 };
 
