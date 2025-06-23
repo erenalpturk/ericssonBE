@@ -9,7 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Tüm tetikleme API'lerini getir
 const getAllTriggers = async (req, res) => {
     try {
-        const { environment, sim_type } = req.query;
+        const { environment, sim_type, payment_type, trigger_type } = req.query;
         
         let query = supabase.from('courier_triggers').select('*');
 
@@ -17,8 +17,17 @@ const getAllTriggers = async (req, res) => {
             query = query.eq('environment', environment);
         }
 
+        // Backward compatibility için sim_type'ı desteklemeye devam et
         if (sim_type) {
-            query = query.eq('sim_type', sim_type);
+            query = query.eq('payment_type', sim_type);
+        }
+
+        if (payment_type) {
+            query = query.eq('payment_type', payment_type);
+        }
+
+        if (trigger_type) {
+            query = query.eq('trigger_type', trigger_type);
         }
 
         query = query.order('order_index', { ascending: true }).order('created_at', { ascending: true });
@@ -48,36 +57,49 @@ const createTrigger = async (req, res) => {
         const {
             environment,
             sim_type,
+            payment_type,
+            trigger_type = 'courier',
             api_name,
             endpoint,
             method = 'POST',
             body,
             headers,
+            validation_script,
             order_index = 0,
             active = true
         } = req.body;
 
+        // Backward compatibility: sim_type varsa payment_type olarak kullan
+        const finalPaymentType = payment_type || sim_type;
+
         // Validation
-        if (!environment || !sim_type || !api_name || !endpoint) {
+        if (!environment || !finalPaymentType || !api_name || !endpoint) {
             return res.status(400).json({
                 success: false,
-                message: 'Environment, sim_type, api_name ve endpoint alanları zorunludur'
+                message: 'Environment, payment_type, api_name ve endpoint alanları zorunludur'
             });
         }
 
         const insertData = {
             environment,
-            sim_type,
+            payment_type: finalPaymentType,
+            trigger_type,
             api_name,
             endpoint,
             method,
             body,
             headers,
+            validation_script,
             order_index,
             active,
             created_by: req.user?.username || 'admin',
             updated_at: new Date().toISOString()
         };
+
+        // Sadece courier tipinde sim_type ekle
+        if (trigger_type === 'courier') {
+            insertData.sim_type = finalPaymentType;
+        }
 
         const { data, error } = await supabase
             .from('courier_triggers')
@@ -119,27 +141,40 @@ const updateTrigger = async (req, res) => {
         const {
             environment,
             sim_type,
+            payment_type,
+            trigger_type,
             api_name,
             endpoint,
             method,
             body,
             headers,
+            validation_script,
             order_index,
             active
         } = req.body;
 
+        // Backward compatibility: sim_type varsa payment_type olarak kullan
+        const finalPaymentType = payment_type || sim_type;
+
         const updateData = {
             environment,
-            sim_type,
+            payment_type: finalPaymentType,
+            trigger_type,
             api_name,
             endpoint,
             method,
             body,
             headers,
+            validation_script,
             order_index,
             active,
             updated_at: new Date().toISOString()
         };
+
+        // Sadece courier tipinde sim_type ekle
+        if (trigger_type === 'courier') {
+            updateData.sim_type = finalPaymentType;
+        }
 
         const { data, error } = await supabase
             .from('courier_triggers')
@@ -243,7 +278,7 @@ const updateTriggerOrder = async (req, res) => {
     }
 };
 
-// Specific environment ve sim_type için aktif API'leri getir
+// Specific environment ve sim_type için aktif API'leri getir (eski format - backward compatibility)
 const getActiveTriggers = async (req, res) => {
     try {
         const { environment, sim_type } = req.params;
@@ -252,7 +287,39 @@ const getActiveTriggers = async (req, res) => {
             .from('courier_triggers')
             .select('*')
             .eq('environment', environment)
-            .eq('sim_type', sim_type)
+            .eq('payment_type', sim_type) // payment_type'ı kullan
+            .eq('trigger_type', 'courier') // Sadece courier tipi
+            .eq('active', true)
+            .order('order_index', { ascending: true });
+
+        if (error) {
+            throw error;
+        }
+
+        res.json({
+            success: true,
+            data: triggers || []
+        });
+    } catch (error) {
+        console.error('Aktif tetikleme API\'leri getirme hatası:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Aktif tetikleme API\'leri getirilemedi'
+        });
+    }
+};
+
+// Yeni format: trigger_type ile aktif API'leri getir
+const getActiveTriggersByType = async (req, res) => {
+    try {
+        const { trigger_type, environment, payment_type } = req.params;
+
+        const { data: triggers, error } = await supabase
+            .from('courier_triggers')
+            .select('*')
+            .eq('trigger_type', trigger_type)
+            .eq('environment', environment)
+            .eq('payment_type', payment_type)
             .eq('active', true)
             .order('order_index', { ascending: true });
 
@@ -366,6 +433,26 @@ const proxyRequest = async (req, res) => {
     }
 };
 
+// Script validation fonksiyonu
+const validateWithScript = (script, response, status, headers) => {
+    try {
+        if (!script || script.trim() === '') {
+            return true; // Script yoksa her zaman geçerli kabul et
+        }
+
+        // VM2 güvenli JavaScript çalıştırma ortamı yerine basit eval kullanıyoruz
+        // Production'da VM2 kullanmak daha güvenli olur
+        const scriptFunction = new Function('response', 'status', 'headers', script);
+        const result = scriptFunction(response, status, headers);
+        
+        return Boolean(result);
+    } catch (error) {
+        console.error('Script validation error:', error);
+        // Script hatası durumunda false döndür (güvenli taraf)
+        return false;
+    }
+};
+
 module.exports = {
     getAllTriggers,
     createTrigger,
@@ -373,5 +460,7 @@ module.exports = {
     deleteTrigger,
     updateTriggerOrder,
     getActiveTriggers,
-    proxyRequest
+    getActiveTriggersByType,
+    proxyRequest,
+    validateWithScript
 }; 

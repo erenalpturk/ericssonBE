@@ -7,6 +7,7 @@ const {
     deleteTrigger,
     updateTriggerOrder,
     getActiveTriggers,
+    getActiveTriggersByType,
     proxyRequest
 } = require('../controllers/courierTriggersController');
 
@@ -45,7 +46,8 @@ const adminOnly = (req, res, next) => {
 };
 
 // Public routes (sadece tetikleme için)
-router.get('/active/:environment/:sim_type', getActiveTriggers);
+router.get('/active/:environment/:sim_type', getActiveTriggers); // Backward compatibility
+router.get('/active/:trigger_type/:environment/:payment_type', getActiveTriggersByType); // Yeni format
 router.post('/proxy', proxyRequest); // CORS bypass proxy
 
 // Admin only routes
