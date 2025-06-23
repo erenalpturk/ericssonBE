@@ -352,19 +352,74 @@ const proxyRequest = async (req, res) => {
             });
         }
 
-        // Base URL belirleme - environment'a göre
-        let baseUrl;
+        // İç ağ kontrolü
+        const isInternalNetwork = endpoint.includes('turktelekom.com.tr') || 
+                                 endpoint.includes('10.') || 
+                                 endpoint.includes('192.168.') || 
+                                 endpoint.includes('172.');
+
         const isProduction = process.env.NODE_ENV === 'production';
-        
-        if (isProduction) {
-            baseUrl = 'https://omnitesttools.vercel.app';
-        } else {
-            // Local development için localhost:3000 kullan
-            baseUrl = 'http://localhost:3000';
+        const isVercelEnvironment = process.env.VERCEL === '1';
+
+        // Production ve Vercel'de iç ağ URL'lerine erişim kontrolü
+        if (isProduction && isVercelEnvironment && isInternalNetwork) {
+            // Bridge proxy var mı kontrol et
+            const bridgeProxyUrl = process.env.BRIDGE_PROXY_URL;
+            
+            if (bridgeProxyUrl) {
+                console.log(`🌉 Using Bridge Proxy: ${bridgeProxyUrl}`);
+                
+                try {
+                    // Bridge proxy üzerinden istek gönder
+                    const bridgeResponse = await axios.post(`${bridgeProxyUrl}/api/internal-proxy`, {
+                        endpoint: endpoint,
+                        method: method,
+                        headers: headers,
+                        body: body,
+                        timeout: 30000
+                    }, {
+                        timeout: 35000,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    return res.status(200).json({
+                        ...bridgeResponse.data,
+                        viaBridge: true,
+                        bridgeUrl: bridgeProxyUrl
+                    });
+                    
+                } catch (bridgeError) {
+                    console.error('Bridge proxy error:', bridgeError);
+                    
+                    return res.status(502).json({
+                        success: false,
+                        message: 'Bridge proxy erişimi başarısız',
+                        error: bridgeError.response?.data?.message || bridgeError.message,
+                        details: {
+                            bridgeUrl: bridgeProxyUrl,
+                            originalEndpoint: endpoint,
+                            suggestion: 'Bridge proxy sunucusunun çalıştığından emin olun'
+                        }
+                    });
+                }
+            }
+            
+            return res.status(403).json({
+                success: false,
+                message: 'İç ağ kaynaklarına Vercel üzerinden erişim yapılamaz',
+                error: 'INTERNAL_NETWORK_ACCESS_DENIED',
+                details: {
+                    endpoint: endpoint,
+                    environment: 'production-vercel',
+                    suggestion: 'BRIDGE_PROXY_URL environment variable ekleyerek iç ağdan bir bridge proxy sunucusu kullanabilirsiniz'
+                }
+            });
         }
 
-        // Full URL oluştur
-        const fullUrl = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+        // URL işleme - artık base URL eklemeye gerek yok
+        const fullUrl = endpoint.startsWith('http') ? endpoint : `https://${endpoint}`;
 
         console.log(`Proxy request: ${method} ${fullUrl}`);
         console.log('Headers:', headers);
@@ -379,7 +434,7 @@ const proxyRequest = async (req, res) => {
                 'User-Agent': 'Omni-Courier-System/1.0',
                 ...headers
             },
-            timeout: 60000, // 60 saniye timeout
+            timeout: 30000, // 30 saniye timeout (iç ağ için düşürdüm)
             validateStatus: () => true // Tüm status kodlarını kabul et
         };
 
@@ -422,6 +477,19 @@ const proxyRequest = async (req, res) => {
                 success: false,
                 message: 'İstek zaman aşımına uğradı',
                 error: 'Timeout'
+            });
+        }
+
+        if (error.code === 'ENOTFOUND') {
+            return res.status(502).json({
+                success: false,
+                message: 'Hedef sunucu bulunamadı (DNS hatası)',
+                error: error.message,
+                details: {
+                    code: error.code,
+                    hostname: error.hostname,
+                    suggestion: 'URL\'nin doğru olduğundan ve sunucunun erişilebilir olduğundan emin olun'
+                }
             });
         }
 
