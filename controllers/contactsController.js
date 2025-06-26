@@ -42,7 +42,7 @@ const getAllContacts = async (req, res) => {
 const createContact = async (req, res) => {
     try {
         const { user_name, system_info, contact_info, contact_type, support_test } = req.body;
-        
+        console.log(req.headers, 'req.headers')
         // User bilgisini header'dan al
         const userHeader = req.headers['x-user-data'];
         if (!userHeader) {
@@ -51,7 +51,6 @@ const createContact = async (req, res) => {
                 message: 'Kullanıcı bilgisi bulunamadı'
             });
         }
-
         const user = JSON.parse(userHeader);
 
         // Gerekli alanlar kontrolü
