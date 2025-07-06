@@ -256,8 +256,8 @@ const getActivations = async (req, res) => {
     // Tarife bilgilerini çek
     const { data: tariffData, error: tariffError } = await supabase
       .from('gnl_parm')
-      .select('id, value')
-      .in('id', activationsData.map(a => a.prod_ofr_id));
+      .select('value, name')
+      .in('value', activationsData.map(a => a.prod_ofr_id));
 
     if (tariffError) throw tariffError;
 
@@ -269,7 +269,7 @@ const getActivations = async (req, res) => {
 
     // Tarife bilgilerini map'le
     const tariffMap = tariffData.reduce((acc, tariff) => {
-      acc[tariff.id] = tariff.value;
+      acc[tariff.value] = tariff.name;
       return acc;
     }, {});
 
@@ -349,8 +349,8 @@ const getActivationsPublic = async (req, res) => {
     // Tarife bilgilerini çek
     const { data: tariffData, error: tariffError } = await supabase
       .from('gnl_parm')
-      .select('id, value')
-      .in('id', activationsData.map(a => a.prod_ofr_id));
+      .select('value, name')
+      .in('value', activationsData.map(a => a.prod_ofr_id));
 
     if (tariffError) throw tariffError;
 
@@ -362,7 +362,7 @@ const getActivationsPublic = async (req, res) => {
 
     // Tarife bilgilerini map'le
     const tariffMap = tariffData.reduce((acc, tariff) => {
-      acc[tariff.id] = tariff.value;
+      acc[tariff.value] = tariff.name;
       return acc;
     }, {});
 
