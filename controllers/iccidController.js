@@ -8,13 +8,14 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const getIccid = async (req, res) => {
   const type = req.params.type;
   const used_by = req.params.sicil_no;
+  const count = req.params.count || 1;
   try {
     const { data, error } = await supabase
       .from('iccidTable')
       .select('iccid, iccidid')
       .eq('stock', 'available')
       .eq('type', type)
-      .limit(1)
+      .limit(count)
       .single();
 
     if (error) {
@@ -440,6 +441,7 @@ const updateActivation = async (req, res) => {
 const formatAndInsertIccids = async (req, res) => {
   try {
     const iccidText = req.body;
+    const { type, environment, gsm_type, dealer, sicil_no } = req.params;
 
     if (typeof iccidText !== 'string') {
       return res.status(400).json({ error: 'iccidText should be a string' });
@@ -449,14 +451,15 @@ const formatAndInsertIccids = async (req, res) => {
       .map(iccid => iccid.trim())
       .filter(iccid => iccid !== '');
 
-    const type = req.params.type || 'defaultType';
-    const sicil_no = req.params.sicil_no;
     const iccidsToInsert = iccidArray.map(iccid => ({
       iccid: iccid,
       stock: 'available',
-      type: type,
       added_by: sicil_no,
-      used_by: sicil_no
+      used_by: sicil_no,
+      type: type,
+      environment: environment,
+      gsm_type: gsm_type,
+      dealer: dealer,
     }));
 
     const { error } = await supabase

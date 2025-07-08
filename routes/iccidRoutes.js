@@ -3,7 +3,7 @@ const router = express.Router();
 const iccidController = require("../controllers/iccidController.js");
 
 // ICCID Management Routes
-router.post("/getIccid/:type/:sicil_no", iccidController.getIccid);
+router.post("/getIccid/:type/:sicil_no/:count", iccidController.getIccid);
 router.post("/update-iccid", iccidController.updateIccid);
 
 // Bulk Operations
@@ -27,6 +27,6 @@ router.post("/transfer-activation", iccidController.transferActivation);
 router.get("/transfer-history/:activationId", iccidController.getTransferHistory);
 
 // ICCID Format and Import Routes
-router.post("/formatAndInsertIccids/:type/:sicil_no", iccidController.formatAndInsertIccids);
+router.post("/formatAndInsertIccids/:type/:environment/:gsm_type/:dealer/:sicil_no", iccidController.formatAndInsertIccids);
 
 module.exports = router;
