@@ -9,6 +9,7 @@ const getIccid = async (req, res) => {
   const type = req.params.type;
   const used_by = req.params.sicil_no;
   const count = req.params.count || 1;
+
   try {
     const { data, error } = await supabase
       .from('iccidTable')
@@ -16,33 +17,112 @@ const getIccid = async (req, res) => {
       .eq('stock', 'available')
       .eq('type', type)
       .limit(count)
-      .single();
-
     if (error) {
       if (error.code === 'PGRST116') {
         return res.status(404).json({ error: `${type} türünde ICCID kalmamış knk` });
       }
       throw error;
     }
+    // data artık array olabilir
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return res.status(404).json({ error: `${type} türünde ICCID kalmamış` });
+    }
 
-    const iccid = data.iccid;
-    const iccidid = data.iccidid;
-    // Update stock to reserved
-    const { error: updateError } = await supabase
-      .from('iccidTable')
-      .update({ stock: 'reserved', used_by: used_by })
-      .eq('iccidid', iccidid)
-      .eq('type', type);
+    // data array ise, her biri için update yap
+    let iccidList = Array.isArray(data) ? data : [data];
+    for (const row of iccidList) {
+      if (!row.iccidid) {
+        return res.status(500).json({ error: 'iccidid eksik' });
+      }
+      const { error: updateError } = await supabase
+        .from('iccidTable')
+        .update({ stock: 'reserved', used_by: used_by })
+        .eq('iccidid', row.iccidid)
+        .eq('type', type);
+      if (updateError) throw updateError;
+    }
 
-    if (updateError) throw updateError;
-
-    res.json({iccidid, iccid});
+    res.json(iccidList);
     // Handle reservation timeout
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+const getIccidNew = async (req, res) => {
+  const { environment, gsm_type, dealer, sicil_no, count } = req.params;
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('iccid, iccidid')
+      .eq('stock', 'available')
+      .eq('environment', environment)
+      .eq('gsm_type', gsm_type)
+      .eq('dealer', dealer)
+      .limit(count)
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: `${gsm_type} türünde ICCID kalmamış knk` });
+      }
+      throw error;
+    }
+    // data artık array olabilir
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return res.status(404).json({ error: `${dealer} için ${gsm_type} türünde ICCID kalmamış` });
+    }
+
+    // data array ise, her biri için update yap
+    let iccidList = Array.isArray(data) ? data : [data];
+    for (const row of iccidList) {
+      if (!row.iccidid) {
+        return res.status(500).json({ error: 'iccidid eksik' });
+      }
+      const { error: updateError } = await supabase
+        .from('iccidTable')
+        .update({ stock: 'reserved', used_by: sicil_no, environment: environment, updated_at: new Date().toISOString() })
+        .eq('iccidid', row.iccidid)
+        .eq('gsm_type', gsm_type)
+        .eq('dealer', dealer);
+      if (updateError) throw updateError;
+    }
+
+    res.json(iccidList);
+    // Handle reservation timeout
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const iccidCountByDealer = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .select('dealer')
+      .eq('stock', 'available');
+
+    if (error) throw error;
+
+    // JS tarafında gruplama + sayma
+    const counts = data.reduce((acc, row) => {
+      acc[row.dealer] = (acc[row.dealer] || 0) + 1;
+      return acc;
+    }, {});
+
+    const dealerCounts = Object.entries(counts).map(([dealer, count]) => ({
+      dealer,
+      count,
+    }));
+
+    res.json(dealerCounts);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
 
 const getIccidByUserId = async (req, res) => {
   const { used_by } = req.params;
@@ -105,13 +185,30 @@ const updateIccid = async (req, res) => {
     return res.status(400).json({ error: "Sold status için used_by zorunlu" });
   }
 
+
   try {
     // Sadece gelen alanları güncelle
     const updateData = {
       updated_at: new Date().toISOString()
     };
     updateData.stock = status;
-    if (used_by) updateData.used_by = used_by;
+
+    // İade: available olduğunda used_by = added_by yapılır
+    if (status === 'available') {
+      const { data: currentRows, error: fetchError } = await supabase
+        .from('iccidTable')
+        .select('added_by')
+        .eq('iccidid', iccidid)
+        .limit(1);
+      if (fetchError) throw fetchError;
+      if (!currentRows || currentRows.length === 0) {
+        return res.status(404).json({ error: `ICCID ${iccidid} not found` });
+      }
+      updateData.used_by = currentRows[0].added_by ?? null;
+    } else if (typeof used_by !== 'undefined') {
+      // Diğer durumlarda frontend'ten gelmişse used_by'yı güncelle
+      updateData.used_by = used_by;
+    }
 
     const { data, error } = await supabase
       .from('iccidTable')
@@ -135,6 +232,21 @@ const updateIccid = async (req, res) => {
   }
 };
 
+const updateSetIccid = async (req, res) => {
+  const { set_table_id, status } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .update({ stock: status })
+      .eq('set_table_id', set_table_id);
+    if (error) throw error;
+    res.json({ message: `${set_table_id} için iccidlerin statüsü ${status} olarak güncellendi` });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 const getAll = async (req, res) => {
   try {
     // Önce ICCID'leri çek
@@ -146,6 +258,92 @@ const getAll = async (req, res) => {
 
     if (iccidData.length === 0) {
       res.json({ message: "ICCID kalmamış knk" });
+    } else {
+      // Kullanıcı bilgilerini çek
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('sicil_no, full_name')
+        .in('sicil_no', [...new Set(iccidData.map(i => [i.added_by, i.used_by]).flat())]);
+
+      if (usersError) throw usersError;
+
+      // Kullanıcı bilgilerini map'le
+      const userMap = usersData.reduce((acc, user) => {
+        acc[user.sicil_no] = user.full_name;
+        return acc;
+      }, {});
+
+      // Verileri birleştir
+      const formattedData = iccidData.map(item => ({
+        ...item,
+        added_by_name: userMap[item.added_by] || 'Bilinmeyen Kullanıcı',
+        used_by_name: userMap[item.used_by] || 'Bilinmeyen Kullanıcı'
+      }));
+
+      res.json(formattedData);
+    }
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const getIccidByAddedByUserId = async (req, res) => {
+  const { added_by } = req.params;
+  try {
+    // Önce ilgili set'e ait ICCID'leri çek
+    const { data: iccidData, error: iccidError } = await supabase
+      .from('iccidTable')
+      .select('*')
+      .eq('added_by', added_by);
+
+    if (iccidError) throw iccidError;
+
+    if (iccidData.length === 0) {
+      res.json({ message: "Bu kullanıcıya ait ICCID yok knk" });
+    } else {
+      // Kullanıcı bilgilerini çek
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('sicil_no, full_name')
+        .in('sicil_no', [...new Set(iccidData.map(i => [i.added_by, i.used_by]).flat())]);
+
+      if (usersError) throw usersError;
+
+      // Kullanıcı bilgilerini map'le
+      const userMap = usersData.reduce((acc, user) => {
+        acc[user.sicil_no] = user.full_name;
+        return acc;
+      }, {});
+
+      // Verileri birleştir
+      const formattedData = iccidData.map(item => ({
+        ...item,
+        added_by_name: userMap[item.added_by] || 'Bilinmeyen Kullanıcı',
+        used_by_name: userMap[item.used_by] || 'Bilinmeyen Kullanıcı'
+      }));
+
+      res.json(formattedData);
+    }
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const getIccidBySet = async (req, res) => {
+  const { set_id } = req.params;
+  try {
+    // Önce ilgili set'e ait ICCID'leri çek
+    const { data: iccidData, error: iccidError } = await supabase
+      .from('iccidTable')
+      .select('*')
+      .eq('set_table_id', set_id);
+
+    if (iccidError) throw iccidError;
+
+    if (iccidData.length === 0) {
+      res.json({ message: "Bu set'e ait ICCID yok knk" });
     } else {
       // Kullanıcı bilgilerini çek
       const { data: usersData, error: usersError } = await supabase
@@ -278,7 +476,7 @@ const getActivations = async (req, res) => {
     const formattedData = activationsData.map(item => {
       // Eğer transfer edilmişse, current_user'ı kullan
       const currentUser = item.transfer_user?.current_user || item.user;
-      
+
       return {
         ...item,
         tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
@@ -371,7 +569,7 @@ const getActivationsPublic = async (req, res) => {
     const formattedData = activationsData.map(item => {
       // Eğer transfer edilmişse, current_user'ı kullan
       const currentUser = item.transfer_user?.current_user || item.user;
-      
+
       return {
         ...item,
         tariff_name: tariffMap[item.prod_ofr_id] || 'Bilinmeyen Tarife',
@@ -441,7 +639,7 @@ const updateActivation = async (req, res) => {
 const formatAndInsertIccids = async (req, res) => {
   try {
     const iccidText = req.body;
-    const { type, environment, gsm_type, dealer, sicil_no } = req.params;
+    const { type, environment, gsm_type, dealer, sicil_no, set_table_id } = req.params;
 
     if (typeof iccidText !== 'string') {
       return res.status(400).json({ error: 'iccidText should be a string' });
@@ -460,6 +658,7 @@ const formatAndInsertIccids = async (req, res) => {
       environment: environment,
       gsm_type: gsm_type,
       dealer: dealer,
+      set_table_id: set_table_id || null, // Eğer set_id varsa ekle
     }));
 
     const { error } = await supabase
@@ -553,12 +752,12 @@ const getStats = async (req, res) => {
     const nameMap = Object.fromEntries(usersInfo.map(u => [u.sicil_no, u.full_name]));
 
     // 4) Gruplama objelerini hazırla
-    const activationsByUser     = {};
-    const activationsByDay      = {};
-    const activationsByType     = {};
-    const activationsByStatus   = {};
-    const activationsByProduct  = {};
-    const activationsByUserDay  = {};
+    const activationsByUser = {};
+    const activationsByDay = {};
+    const activationsByType = {};
+    const activationsByStatus = {};
+    const activationsByProduct = {};
+    const activationsByUserDay = {};
     const activationsByProdType = {};
 
     // 5) Tek döngüyle tüm sayımları yap, user yerine full_name kullan
@@ -572,7 +771,7 @@ const getStats = async (req, res) => {
       } = record;
 
       const fullName = nameMap[userId] || 'Bilinmeyen Kullanıcı';
-      const day      = new Date(created_at).toISOString().slice(0,10);
+      const day = new Date(created_at).toISOString().slice(0, 10);
 
       // byUser
       activationsByUser[fullName] = (activationsByUser[fullName] || 0) + 1;
@@ -617,13 +816,13 @@ const getStats = async (req, res) => {
     res.json({
       totalActivations,
       activations: {
-        byUser:       activationsByUser,
-        byDay:        activationsByDay,
-        byType:       activationsByType,
-        byStatus:     activationsByStatus,
-        byProduct:    activationsByProduct,
-        byUserDay:    activationsByUserDay,
-        byProdType:   activationsByProdType
+        byUser: activationsByUser,
+        byDay: activationsByDay,
+        byType: activationsByType,
+        byStatus: activationsByStatus,
+        byProduct: activationsByProduct,
+        byUserDay: activationsByUserDay,
+        byProdType: activationsByProdType
       }
     });
   } catch (err) {
@@ -632,7 +831,6 @@ const getStats = async (req, res) => {
   }
 };
 
-// Transfer işlemi
 const transferActivation = async (req, res) => {
   const { activationId, fromUser, toUser } = req.body;
 
@@ -685,7 +883,7 @@ const transferActivation = async (req, res) => {
 
     // Transfer geçmişini hazırla
     const currentTransfers = activationData.transfer_user?.transfers || [];
-    
+
     // Önceki transferi pasif yap
     const updatedTransfers = currentTransfers.map(transfer => ({
       ...transfer,
@@ -730,7 +928,7 @@ const transferActivation = async (req, res) => {
     if (!fromUserError && fromUserData) {
       // Alıcı kullanıcıya bildirim gönder
       const notificationMessage = `${fromUserData.full_name} size bir data transfer etti. MSISDN: ${activationData.msisdn}`;
-      
+
       const { error: notificationError } = await supabase
         .from('notifications')
         .insert({
@@ -757,7 +955,6 @@ const transferActivation = async (req, res) => {
   }
 };
 
-// Transfer geçmişini getir
 const getTransferHistory = async (req, res) => {
   const { activationId } = req.params;
 
@@ -830,11 +1027,227 @@ const getTransferHistory = async (req, res) => {
   }
 };
 
+const getParams = async (req, res) => {
+  const { type, env } = req.params;
+  try {
+    let query = supabase
+      .from('gnl_parm')
+      .select('*')
+      .eq('gnl_parm_type_id', type);
 
+    // env parametresi varsa filtreleme ekle
+    if (env) {
+      query = query.or(`extra_field1.eq.${env},extra_field1.eq.all`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in getParams:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const addParams = async (req, res) => {
+  const { type, name } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('gnl_parm')
+      .insert({ gnl_parm_type_id: type, name: name, value: name });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in addParams:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const deleteParams = async (req, res) => {
+  const { type, userId, value } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('gnl_parm')
+      .delete()
+      .eq('gnl_parm_type_id', type)
+      .eq('value', value)
+
+    if (data.user_sicil_no !== userId) {
+      return res.status(403).json({
+        error: "Silme işlemini sadece kendi eklediklerinizde yapabilirsiniz"
+      });
+    }
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in deleteParams:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const addSet = async (req, res) => {
+  const { set_name, user_id } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('set_table')
+      .insert({ set_name: set_name, set_owner_id: user_id });
+
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in addSet:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+const deleteSet = async (req, res) => {
+  const { set_id } = req.body;
+
+  try {
+    // Önce iccidTable'daki ilişkili kayıtları sil
+    const { error: iccidError } = await supabase
+      .from('iccidTable')
+      .delete()
+      .eq('set_table_id', set_id);
+
+    if (iccidError) throw iccidError;
+
+    // Sonra set_table'daki ana kaydı sil
+    const { data, error: setError } = await supabase
+      .from('set_table')
+      .delete()
+      .eq('id', set_id)
+      .select(); // Silinen kaydı geri döndürmek istersen .select() ekleyebilirsin
+
+    if (setError) throw setError;
+
+    // Tek response gönder
+    res.json({ success: true, deletedSet: data });
+  } catch (err) {
+    console.error("Error in deleteSet:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
+
+const updateSet = async (req, res) => {
+  const { set_id, set_name } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('set_table')
+      .update({ set_name: set_name })
+      .eq('set_table_id', set_id);
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in updateSet:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const getSets = async (req, res) => {
+  const { user_id } = req.params;
+  try {
+    const { data, error } = await supabase
+      .from('set_table')
+      .select('*')
+      .eq('set_owner_id', user_id)
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("Error in getSets:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const updateSetName = async (req, res) => {
+  const { set_id, set_name } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('set_table')
+      .update({ set_name: set_name })
+      .eq('id', set_id);
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in updateSetName:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const addIccidToSet = async (req, res) => {
+  const { set_id, iccid } = req.body;
+
+  try {
+    // Önce ICCID'nin mevcut olup olmadığını kontrol et
+    const { data: iccidData, error: iccidError } = await supabase
+      .from('iccidTable')
+      .select('iccidid')
+      .eq('iccid', iccid)
+      .single();
+
+    if (iccidError || !iccidData) {
+      return res.status(404).json({ error: "ICCID bulunamadı" });
+    }
+
+    // ICCID'yi sete ekle
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .update({ set_table_id: set_id })
+      .eq('iccidid', iccidData.iccidid);
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in addIccidToSet:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const removeIccidFromSet = async (req, res) => {
+  const { set_id, iccid_id } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('iccidTable')
+      .update({ set_table_id: null })
+      .eq('iccidid', iccid_id)
+      .eq('set_table_id', set_id);
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error in removeIccidFromSet:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
 
 
 module.exports = {
   getIccid,
+  getIccidBySet,
+  updateSetIccid,
+  getIccidNew,
+  iccidCountByDealer,
   deleteAll,
   addActivation,
   getActivations,
@@ -847,6 +1260,17 @@ module.exports = {
   getIccidByUserId,
   updateActivation,
   getAll,
+  getIccidByAddedByUserId,
   transferActivation,
-  getTransferHistory
+  getTransferHistory,
+  getParams,
+  addParams,
+  deleteParams,
+  addSet,
+  deleteSet,
+  updateSet,
+  getSets,
+  updateSetName,
+  addIccidToSet,
+  removeIccidFromSet
 };

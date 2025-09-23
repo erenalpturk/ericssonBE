@@ -24,6 +24,9 @@ const projectsRoutes = require('./routes/projects');
 const contactsRoutes = require('./routes/contacts');
 const oracleRoutes = require('./routes/oracleRoutes');
 const courierTriggersRoutes = require('./routes/courierTriggersRoutes');
+const paramsRoutes = require('./routes/paramsRoutes');
+const userManagementRoutes = require('./routes/userManagementRoutes');
+const statsRoutes = require('./routes/statsRoutes');
 
 // Middleware
 app.use(cors());
@@ -41,6 +44,9 @@ app.use('/api/projects', projectsRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/oracle', oracleRoutes);
 app.use('/api/courier-triggers', courierTriggersRoutes);
+app.use('/params', paramsRoutes);
+app.use('/users', userManagementRoutes);
+app.use('/stats', statsRoutes);
 
 // Swagger yapılandırması
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger/index.yaml'));
