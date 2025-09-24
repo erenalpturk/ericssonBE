@@ -99,23 +99,27 @@ const iccidCountByDealer = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('iccidTable')
-      .select('dealer')
+      .select('dealer, gsm_type')
       .eq('stock', 'available');
 
     if (error) throw error;
 
-    // JS tarafında gruplama + sayma
-    const counts = data.reduce((acc, row) => {
-      acc[row.dealer] = (acc[row.dealer] || 0) + 1;
+    // dealer bazında pivot: pre, post ve total
+    const byDealer = data.reduce((acc, row) => {
+      const dealer = row.dealer || 'unknown';
+      const gsmType = (row.gsm_type || 'unknown').toLowerCase(); // 'pre' | 'post' | other
+      if (!acc[dealer]) {
+        acc[dealer] = { dealer, pre: 0, post: 0, total: 0 };
+      }
+      if (gsmType === 'pre') acc[dealer].pre += 1;
+      else if (gsmType === 'post') acc[dealer].post += 1;
+      acc[dealer].total += 1;
       return acc;
     }, {});
 
-    const dealerCounts = Object.entries(counts).map(([dealer, count]) => ({
-      dealer,
-      count,
-    }));
+    const result = Object.values(byDealer);
 
-    res.json(dealerCounts);
+    res.json(result);
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
