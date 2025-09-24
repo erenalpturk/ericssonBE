@@ -600,11 +600,11 @@ const getActivationsPublic = async (req, res) => {
 };
 
 const updateActivation = async (req, res) => {
-  const { activationId, status, note } = req.body;
+  const { activationId, status, note, is_vsbl } = req.body;
   // activationId zorunlu, en az bir alan güncellenecek
-  if (!activationId || (status === undefined && note === undefined)) {
+  if (!activationId || (status === undefined && note === undefined && is_vsbl === undefined)) {
     return res.status(400).json({
-      error: "Aktivasyon ID ile birlikte en az bir güncellenecek alan (status veya note) gönderilmelidir"
+      error: "Aktivasyon ID ile birlikte en az bir güncellenecek alan (status veya note veya is_vsbl) gönderilmelidir"
     });
   }
 
@@ -615,6 +615,7 @@ const updateActivation = async (req, res) => {
     };
     if (status !== undefined) updateData.status = status;
     if (note !== undefined) updateData.note = note;
+    if (is_vsbl !== undefined) updateData.is_vsbl = is_vsbl;
 
     const { data, error } = await supabase
       .from("activationstable")
