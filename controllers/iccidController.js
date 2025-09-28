@@ -60,6 +60,7 @@ const getIccidNew = async (req, res) => {
       .eq('environment', environment)
       .eq('gsm_type', gsm_type)
       .eq('dealer', dealer)
+      .order('updated_at', { ascending: true })
       .limit(count)
     if (error) {
       if (error.code === 'PGRST116') {
@@ -241,7 +242,7 @@ const updateSetIccid = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('iccidTable')
-      .update({ stock: status })
+      .update({ stock: status, updated_at: new Date().toISOString() })
       .eq('set_table_id', set_table_id);
     if (error) throw error;
     res.json({ message: `${set_table_id} için iccidlerin statüsü ${status} olarak güncellendi` });
@@ -1172,7 +1173,26 @@ const getSets = async (req, res) => {
       .select('*')
       .eq('set_owner_id', user_id)
     if (error) throw error;
-    res.json(data);
+    
+    // Her set için en son güncelleme tarihini al
+    const setsWithLastUpdate = await Promise.all(data.map(async (set) => {
+      const { data: iccidData, error: iccidError } = await supabase
+        .from('iccidTable')
+        .select('updated_at')
+        .eq('set_table_id', set.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      
+      if (iccidError) {
+        console.error("Error fetching last update for set:", set.id, iccidError);
+        return { ...set, last_updated_at: null };
+      }
+      
+      const lastUpdatedAt = iccidData && iccidData.length > 0 ? iccidData[0].updated_at : null;
+      return { ...set, last_updated_at: lastUpdatedAt };
+    }));
+    
+    res.json(setsWithLastUpdate);
   } catch (err) {
     console.error("Error in getSets:", err);
     res.status(500).json({ error: "Internal Server Error" });
